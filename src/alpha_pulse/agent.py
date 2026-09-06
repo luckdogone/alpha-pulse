@@ -29,6 +29,8 @@ class AgentError(RuntimeError):
 
 
 class ClaudeModel:
+    provider_label = "Claude"
+
     def __init__(self, settings: Settings):
         self.settings = settings
         kwargs = {
@@ -53,8 +55,8 @@ class ClaudeModel:
     async def close(self):
         await self.client.close()
 
-    async def complete(self, messages: list[dict], tools: list[dict], *, final: bool):
-        params = {
+    def request_parameters(self, messages: list[dict], tools: list[dict], *, final: bool) -> dict:
+        return {
             "model": self.settings.anthropic_model,
             "max_tokens": 8192,
             "system": SYSTEM_PROMPT,
@@ -67,11 +69,17 @@ class ClaudeModel:
             },
             "tool_choice": {"type": "none" if final else "auto"},
         }
-        messages_api = self.client.messages
-        if self.settings.anthropic_fallbacks and self.settings.anthropic_model in {
+
+    def use_fallbacks(self) -> bool:
+        return self.settings.anthropic_fallbacks and self.settings.anthropic_model in {
             "claude-opus-5",
             "claude-fable-5",
-        }:
+        }
+
+    async def complete(self, messages: list[dict], tools: list[dict], *, final: bool):
+        params = self.request_parameters(messages, tools, final=final)
+        messages_api = self.client.messages
+        if self.use_fallbacks():
             messages_api = self.client.beta.messages
             params.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
         try:
@@ -79,21 +87,69 @@ class ClaudeModel:
                 async with messages_api.stream(**params) as stream:
                     return await stream.get_final_message()
         except anthropic.AuthenticationError:
-            raise AgentError("Claude authentication failed") from None
+            raise AgentError(f"{self.provider_label} authentication failed") from None
         except anthropic.PermissionDeniedError:
-            raise AgentError("Claude account lacks model/API permissions") from None
+            raise AgentError(f"{self.provider_label} account lacks model/API permissions") from None
         except anthropic.NotFoundError:
             raise AgentError(
-                "Claude model/endpoint not found; check ANTHROPIC_MODEL and base URL"
+                f"{self.provider_label} model/endpoint not found; check model and base URL"
             ) from None
         except anthropic.RateLimitError:
-            raise AgentError("Claude rate limit exceeded") from None
+            raise AgentError(f"{self.provider_label} rate limit exceeded") from None
         except anthropic.APIStatusError as exc:
             raise AgentError(
-                f"Claude HTTP {exc.status_code}; check model and API configuration"
+                f"{self.provider_label} HTTP {exc.status_code}; check model and API configuration"
             ) from None
         except (anthropic.APIConnectionError, TimeoutError):
-            raise AgentError("Claude connection failed or model timeout exceeded") from None
+            raise AgentError(
+                f"{self.provider_label} connection failed or model timeout exceeded"
+            ) from None
+
+
+class DeepSeekModel(ClaudeModel):
+    """DeepSeek's officially documented /anthropic API; requests go only to DeepSeek."""
+
+    provider_label = "DeepSeek"
+
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        if settings.deepseek_api_key is None:
+            raise AgentError("DeepSeek authentication unavailable; configure DEEPSEEK_API_KEY")
+        self.client = anthropic.AsyncAnthropic(
+            # SDK 1.4+ treats explicit credentials as complete; no Claude token is inherited.
+            api_key=settings.deepseek_api_key.get_secret_value(),
+            base_url=settings.deepseek_base_url,
+            http_client=anthropic.DefaultAsyncHttpxClient(
+                proxy=settings.proxy(), trust_env=False, timeout=settings.model_timeout_seconds
+            ),
+            max_retries=1,
+        )
+
+    def use_fallbacks(self) -> bool:
+        return False
+
+    def request_parameters(self, messages: list[dict], tools: list[dict], *, final: bool) -> dict:
+        # DeepSeek supports output_config.effort, but not output_config.format on this API.
+        # Explicit instructions and shared Pydantic validation enforce the JSON contract.
+        json_instructions = (
+            "\nWhen you finish, output exactly one JSON object, without markdown fences. "
+            "Use only the fields in this JSON Schema: "
+            + dumps(ASSESSMENT_SCHEMA)
+            + '\nExample shape: {"decision":"no_trade","confidence":0.5,'
+            '"rationale":"证据不足。","evidence_ids":["an_existing_evidence_id"],"risks":[]}.'
+            " Replace the example ID with real supplied evidence IDs. "
+            "When more data is needed, use native tool calls before the final JSON."
+        )
+        return {
+            "model": self.settings.deepseek_model,
+            "max_tokens": 8192,
+            "system": SYSTEM_PROMPT + json_instructions,
+            "messages": messages,
+            "tools": tools,
+            "thinking": {"type": "enabled", "budget_tokens": 4096},
+            "output_config": {"effort": self.settings.deepseek_effort},
+            "tool_choice": {"type": "none" if final else "auto"},
+        }
 
 
 class AgentHarness:

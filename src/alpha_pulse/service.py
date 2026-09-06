@@ -3,7 +3,7 @@ import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from .agent import AgentError, AgentHarness, ClaudeModel
+from .agent import AgentError, AgentHarness, ClaudeModel, DeepSeekModel
 from .binance import Binance
 from .config import Settings
 from .context import ContextWindow
@@ -40,7 +40,7 @@ def prediction(
         rationale = assessment.rationale
     validity = settings.analysis_validity_minutes * 60
     evidence = []
-    cited = set(assessment.evidence_ids if assessment and engine == "claude" else [])
+    cited = set(assessment.evidence_ids if assessment and engine in {"claude", "deepseek"} else [])
     for row in store.ledger(at):
         evidence.append(
             {k: row[k] for k in ("id", "tool", "source", "status", "observed_at", "quality")}
@@ -77,12 +77,13 @@ async def analyze(
     settings: Settings,
     symbol: str = "BTCUSDT",
     interval: str = "1m",
-    engine: str = "claude",
+    engine: str | None = None,
     scenario: str = "long",
 ) -> Prediction:
     symbol = normalize_symbol(symbol)
-    if engine not in {"claude", "rules", "demo"}:
-        raise ValueError("engine must be claude, rules, or demo")
+    engine = engine or settings.model_provider
+    if engine not in {"claude", "deepseek", "rules", "demo"}:
+        raise ValueError("engine must be claude, deepseek, rules, or demo")
     if interval not in INTERVAL_MS:
         raise ValueError("analysis interval must be a fixed Binance interval")
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ_") + uuid4().hex[:10]
@@ -130,8 +131,10 @@ async def analyze(
                     rationale="必需行情缺失、过期或不完整，暂不生成方向和价格区间。",
                 )
             else:
-                if engine == "claude":
-                    model = ClaudeModel(settings)
+                if engine in {"claude", "deepseek"}:
+                    model = (
+                        DeepSeekModel(settings) if engine == "deepseek" else ClaudeModel(settings)
+                    )
                     registry = ToolRegistry(market, external, store, settings.max_tool_calls)
                     context = ContextWindow(
                         snapshot,
@@ -165,7 +168,7 @@ async def analyze(
                     reason = "agent_veto"
                 if eligible and assessment.confidence < tree.config.risk.minimum_confidence:
                     eligible, reason = False, "low_confidence"
-                if eligible and engine == "claude":
+                if eligible and engine in {"claude", "deepseek"}:
                     old_price, old_atr = (
                         snapshot.order_book["mid_price"],
                         snapshot.indicators["atr14"],
@@ -236,8 +239,8 @@ async def analyze(
                 "run_id": run_id,
                 "tree": tree.config.model_dump(),
                 "engine": engine,
-                "model": settings.anthropic_model,
-                "model_fallbacks": settings.anthropic_fallbacks,
+                "model": settings.model_name(engine) if engine in {"claude", "deepseek"} else None,
+                "model_fallbacks": settings.anthropic_fallbacks if engine == "claude" else False,
             },
             ensure_ascii=False,
             indent=2,

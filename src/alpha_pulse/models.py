@@ -180,7 +180,7 @@ class Prediction(Model):
     risks: list[str] = Field(default_factory=list)
     evidence: list[dict[str, Any]] = Field(default_factory=list)
     decision_path: list[dict[str, Any]] = Field(default_factory=list)
-    engine: Literal["claude", "rules", "demo", "guard"]
+    engine: Literal["claude", "deepseek", "rules", "demo", "guard"]
 
     @model_validator(mode="after")
     def consistent(self) -> "Prediction":

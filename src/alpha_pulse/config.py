@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
@@ -8,6 +9,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
 
+    model_provider: Literal["claude", "deepseek"] = "claude"
+    deepseek_api_key: SecretStr | None = None
+    deepseek_base_url: str = "https://api.deepseek.com/anthropic"
+    deepseek_model: Literal["deepseek-v4-pro", "deepseek-v4-flash"] = "deepseek-v4-pro"
+    deepseek_effort: Literal["low", "high", "max"] = "high"
     anthropic_api_key: SecretStr | None = None
     anthropic_auth_token: SecretStr | None = None
     anthropic_base_url: str = "https://api.anthropic.com"
@@ -64,3 +70,10 @@ class Settings(BaseSettings):
 
     def tree_file(self) -> Path:
         return self.decision_tree_path or Path(__file__).with_name("default_decision_tree.json")
+
+    def model_name(self, provider: str | None = None) -> str:
+        return (
+            self.deepseek_model
+            if (provider or self.model_provider) == "deepseek"
+            else self.anthropic_model
+        )

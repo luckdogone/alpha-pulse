@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "run_id": "20260906T084908Z_b9931777be",
+  "run_id": "20260906T095053Z_eabc8cf0a0",
   "symbol": "BTCUSDT",
   "market": "binance_usdm_futures",
   "interval": "1m",
@@ -8,10 +8,10 @@
   "direction": "neutral",
   "market_regime": "ranging",
   "reason_code": "ranging",
-  "generated_at": 1788684548617,
-  "data_as_of": 1788684548615,
-  "valid_from": 1788684548617,
-  "valid_until": 1788686348617,
+  "generated_at": 1788688253374,
+  "data_as_of": 1788688253370,
+  "valid_from": 1788688253374,
+  "valid_until": 1788690053374,
   "validity_seconds": 1800,
   "reference_price": 99.97573679951145,
   "entry_zone": null,
@@ -26,11 +26,11 @@
   ],
   "evidence": [
     {
-      "id": "ev_b22ee8729e074731",
+      "id": "ev_6fd76a7e25814bb1",
       "tool": "get_klines",
       "source": "synthetic",
       "status": "ok",
-      "observed_at": 1788684548615,
+      "observed_at": 1788688253370,
       "quality": {
         "score": 0.0,
         "level": "low",
@@ -43,11 +43,11 @@
       "cited_by_model": false
     },
     {
-      "id": "ev_37df5973fcfd467a",
+      "id": "ev_ee6831c308bf4db8",
       "tool": "get_recent_1m",
       "source": "synthetic",
       "status": "ok",
-      "observed_at": 1788684548615,
+      "observed_at": 1788688253370,
       "quality": {
         "score": 0.0,
         "level": "low",
@@ -60,11 +60,11 @@
       "cited_by_model": false
     },
     {
-      "id": "ev_9f7c4855567f400a",
+      "id": "ev_00ba79ba891845b5",
       "tool": "get_order_book",
       "source": "synthetic",
       "status": "ok",
-      "observed_at": 1788684548615,
+      "observed_at": 1788688253370,
       "quality": {
         "score": 0.0,
         "level": "low",
@@ -77,11 +77,11 @@
       "cited_by_model": false
     },
     {
-      "id": "ev_4336e1ba75ec4c79",
+      "id": "ev_af0d8deaca1a44bd",
       "tool": "get_order_flow",
       "source": "synthetic",
       "status": "ok",
-      "observed_at": 1788684548615,
+      "observed_at": 1788688253370,
       "quality": {
         "score": 0.0,
         "level": "low",
@@ -94,11 +94,11 @@
       "cited_by_model": false
     },
     {
-      "id": "ev_58c7205b10e243b4",
+      "id": "ev_90d035956a544d78",
       "tool": "get_mark_price",
       "source": "synthetic",
       "status": "ok",
-      "observed_at": 1788684548615,
+      "observed_at": 1788688253370,
       "quality": {
         "score": 0.0,
         "level": "low",
@@ -111,11 +111,11 @@
       "cited_by_model": false
     },
     {
-      "id": "ev_fba344fe1217426a",
+      "id": "ev_162cec32b160410c",
       "tool": "get_open_interest",
       "source": "synthetic",
       "status": "ok",
-      "observed_at": 1788684548615,
+      "observed_at": 1788688253370,
       "quality": {
         "score": 0.0,
         "level": "low",

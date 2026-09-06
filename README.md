@@ -11,17 +11,22 @@ uv run alpha-pulse doctor
 uv run alpha-pulse analyze --symbol BTCUSDT --interval 1m
 ```
 
-在 `.env` 中配置模型凭据；默认沿用现有的 Claude 配置：
+在 `.env` 中配置模型凭据；示例和本机配置使用 DeepSeek：
 
 ```dotenv
-ANTHROPIC_API_KEY=你的密钥
-ANTHROPIC_MODEL=claude-opus-5
+MODEL_PROVIDER=deepseek
+DEEPSEEK_API_KEY=你的密钥
+DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic
+DEEPSEEK_MODEL=deepseek-v4-pro
+DEEPSEEK_EFFORT=high
 HTTPS_PROXY=http://127.0.0.1:13659
 HTTP_PROXY=http://127.0.0.1:13659
 ALL_PROXY=socks5://127.0.0.1:13659
 ```
 
-SDK 也可使用现有 `ant auth login` 登录。`doctor` 只验证 REST/WSS 和配置状态，不调用模型、不验证模型账户权限。模型、数据源密钥请留在 `.env`，不要提交。Claude Opus 5/Fable 5 默认开启 API 服务端 refusal fallback，可通过 `ANTHROPIC_FALLBACKS=false` 关闭；实际响应模型记录在运行轨迹中。
+使用 [DeepSeek 官方 Anthropic 兼容接口](https://api-docs.deepseek.com/guides/anthropic_api/)，请求发往 DeepSeek，不需要 Claude 账户。模型可选 `deepseek-v4-pro` 或 `deepseek-v4-flash`，思考强度可选 `low/high/max`。该接口不支持 `output_config.format`，因此通过明确的 JSON Schema 提示、Pydantic 校验和修复轮次保证本地输出契约；模型输出无法通过校验时返回故障型 `no_trade`。
+
+`analyze` 和 `watch` 默认读取 `MODEL_PROVIDER`，也可显式指定 `--engine deepseek`。原有 Claude 接入保留，配置 `ANTHROPIC_API_KEY` 后用 `--engine claude` 选择；Claude 的登录凭据和服务端 fallback 不用于 DeepSeek 请求。`doctor` 只验证 REST/WSS 和配置状态，不调用模型、不验证模型账户权限。模型、数据源密钥请留在 `.env`，不要提交。
 
 代理会显式传入 REST 和 WebSocket 客户端。配置优先级为 `BINANCE_PROXY`（仅币安）→ `HTTPS_PROXY` → `HTTP_PROXY` → `ALL_PROXY`。环境变量优先于 `.env`，代理变量支持大小写；未配置则直连。HTTP CONNECT 和 SOCKS5 均支持，保持 TLS 证书校验。
 
@@ -80,7 +85,7 @@ ONCHAIN_API_KEY=
 
 ## Agent 与上下文
 
-`market.py` 准备必要数据；`tools.py` 注册有类型校验的只读工具；`agent.py` 使用官方 Anthropic SDK 流式响应，并控制调用轮数、工具次数、超时、错误返回和最终结构校验。模型可自主选择补充工具，再接受或否决决策树允许的方向。
+`market.py` 准备必要数据；`tools.py` 注册有类型校验的只读工具；`agent.py` 通过官方 Anthropic SDK 对接 DeepSeek 兼容接口或 Claude，处理流式响应，并控制调用轮数、工具次数、超时、错误返回和最终结构校验。模型可自主选择补充工具，再接受或否决决策树允许的方向。工具调用历史中的思考块按接口要求原样回传，不写入运行轨迹。
 
 上下文分为固定任务/规则、近期行情和指标、证据索引、工作笔记、最近完整工具交换。原始数据保存到 `runs/<run_id>/evidence/`；模型默认收到摘要，需要时按证据 ID 分页回读。超过 `CONTEXT_MAX_BYTES` 时只移除完整的旧工具调用与结果对，保留索引和笔记；这是明确的 UTF-8 字节预算，不是声称精确的 token 计数。全部原始证据仍保留在运行目录。外部正文、标题和笔记均标记为不可信数据，不作为系统指令。
 

@@ -201,6 +201,7 @@
     "engine": {
       "enum": [
         "claude",
+        "deepseek",
         "rules",
         "demo",
         "guard"

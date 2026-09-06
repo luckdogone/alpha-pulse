@@ -27,7 +27,12 @@ def parser() -> argparse.ArgumentParser:
             default="1m",
         )
         if name in {"analyze", "watch"}:
-            cmd.add_argument("--engine", choices=["claude", "rules"], default="claude")
+            cmd.add_argument(
+                "--engine",
+                choices=["deepseek", "claude", "rules"],
+                default=None,
+                help="默认读取 .env 中的 MODEL_PROVIDER",
+            )
         if name in {"watch", "stream"}:
             cmd.add_argument("--count", type=int, default=0, help="输出数量；0 表示持续运行")
         if name in {"analyze", "snapshot", "klines"}:
@@ -137,11 +142,12 @@ async def run(args) -> int:
         elif args.command == "doctor":
             report = {
                 "proxy_configured": bool(settings.proxy(binance=True)),
-                "claude_model": settings.anthropic_model,
-                "claude_credentials_in_settings": bool(
-                    settings.anthropic_api_key or settings.anthropic_auth_token
-                ),
-                "claude_auth_note": "SDK may resolve an ant login profile; model API not called",
+                "model_provider": settings.model_provider,
+                "model": settings.model_name(),
+                "model_credentials_in_settings": bool(settings.deepseek_api_key)
+                if settings.model_provider == "deepseek"
+                else bool(settings.anthropic_api_key or settings.anthropic_auth_token),
+                "model_api_checked": False,
                 "coinglass_configured": bool(settings.coinglass_api_key),
             }
             try:
