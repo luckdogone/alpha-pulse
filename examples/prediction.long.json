@@ -1,0 +1,322 @@
+{
+  "schema_version": "1.0",
+  "run_id": "20260906T084908Z_9e3bd384d8",
+  "symbol": "BTCUSDT",
+  "market": "binance_usdm_futures",
+  "interval": "1m",
+  "status": "trade",
+  "direction": "long",
+  "market_regime": "trending",
+  "reason_code": "setup_confirmed",
+  "generated_at": 1788684548579,
+  "data_as_of": 1788684548574,
+  "valid_from": 1788684548579,
+  "valid_until": 1788686348579,
+  "validity_seconds": 1800,
+  "reference_price": 107.7499999999716,
+  "entry_zone": {
+    "low": 107.718,
+    "high": 107.782
+  },
+  "take_profit_zone": {
+    "low": 109.225,
+    "high": 109.385
+  },
+  "stop_loss_zone": {
+    "low": 107.287,
+    "high": 107.336
+  },
+  "risk_reward_ratio": 2.000697,
+  "confidence": 0.65,
+  "confidence_kind": "uncalibrated_assessment",
+  "rationale": "合成数据演示。",
+  "risks": [
+    "默认决策树尚未经过回测；confidence 不是胜率。"
+  ],
+  "evidence": [
+    {
+      "id": "ev_531f8c7c4f354bc4",
+      "tool": "get_klines",
+      "source": "synthetic",
+      "status": "ok",
+      "observed_at": 1788684548574,
+      "quality": {
+        "score": 0.0,
+        "level": "low",
+        "reasons": [
+          "source=synthetic",
+          "within data-specific freshness window"
+        ],
+        "method": "source_freshness_completeness_v1; not a probability of truth"
+      },
+      "cited_by_model": false
+    },
+    {
+      "id": "ev_59c129945cea4b73",
+      "tool": "get_recent_1m",
+      "source": "synthetic",
+      "status": "ok",
+      "observed_at": 1788684548574,
+      "quality": {
+        "score": 0.0,
+        "level": "low",
+        "reasons": [
+          "source=synthetic",
+          "within data-specific freshness window"
+        ],
+        "method": "source_freshness_completeness_v1; not a probability of truth"
+      },
+      "cited_by_model": false
+    },
+    {
+      "id": "ev_56653e01a429438f",
+      "tool": "get_order_book",
+      "source": "synthetic",
+      "status": "ok",
+      "observed_at": 1788684548574,
+      "quality": {
+        "score": 0.0,
+        "level": "low",
+        "reasons": [
+          "source=synthetic",
+          "within data-specific freshness window"
+        ],
+        "method": "source_freshness_completeness_v1; not a probability of truth"
+      },
+      "cited_by_model": false
+    },
+    {
+      "id": "ev_bd5d46779e2d4bae",
+      "tool": "get_order_flow",
+      "source": "synthetic",
+      "status": "ok",
+      "observed_at": 1788684548574,
+      "quality": {
+        "score": 0.0,
+        "level": "low",
+        "reasons": [
+          "source=synthetic",
+          "within data-specific freshness window"
+        ],
+        "method": "source_freshness_completeness_v1; not a probability of truth"
+      },
+      "cited_by_model": false
+    },
+    {
+      "id": "ev_04fd5c2e98794681",
+      "tool": "get_mark_price",
+      "source": "synthetic",
+      "status": "ok",
+      "observed_at": 1788684548574,
+      "quality": {
+        "score": 0.0,
+        "level": "low",
+        "reasons": [
+          "source=synthetic",
+          "within data-specific freshness window"
+        ],
+        "method": "source_freshness_completeness_v1; not a probability of truth"
+      },
+      "cited_by_model": false
+    },
+    {
+      "id": "ev_4ea174bd452244d7",
+      "tool": "get_open_interest",
+      "source": "synthetic",
+      "status": "ok",
+      "observed_at": 1788684548574,
+      "quality": {
+        "score": 0.0,
+        "level": "low",
+        "reasons": [
+          "source=synthetic",
+          "within data-specific freshness window"
+        ],
+        "method": "source_freshness_completeness_v1; not a probability of truth"
+      },
+      "cited_by_model": false
+    }
+  ],
+  "decision_path": [
+    {
+      "node": "data_quality",
+      "passed": true,
+      "problems": []
+    },
+    {
+      "node": "spread",
+      "passed": true,
+      "checks": [
+        {
+          "field": "spread_bps",
+          "op": "le",
+          "value": 5.0,
+          "actual": 1,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "node": "liquidity",
+      "passed": true,
+      "checks": [
+        {
+          "field": "min_book_notional",
+          "op": "ge",
+          "value": 100000.0,
+          "actual": 800000,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "node": "volatility_floor",
+      "passed": true,
+      "checks": [
+        {
+          "field": "atr_pct",
+          "op": "ge",
+          "value": 0.02,
+          "actual": 0.2959564136866894,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "node": "volatility_ceiling",
+      "passed": true,
+      "checks": [
+        {
+          "field": "atr_pct",
+          "op": "le",
+          "value": 3.0,
+          "actual": 0.2959564136866894,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "node": "trend",
+      "passed": true,
+      "checks": [
+        {
+          "field": "trend_strength_atr",
+          "op": "ge",
+          "value": 0.15,
+          "actual": 0.6577826945021115,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "node": "funding",
+      "passed": true,
+      "checks": [
+        {
+          "field": "abs_funding_rate",
+          "op": "le",
+          "value": 0.003,
+          "actual": 0.0001,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "node": "long",
+      "passed": true,
+      "checks": [
+        {
+          "field": "ema_alignment",
+          "op": "eq",
+          "value": 1.0,
+          "actual": 1,
+          "passed": true
+        },
+        {
+          "field": "macd_histogram",
+          "op": "ge",
+          "value": 0.0,
+          "actual": 0.008442279991837442,
+          "passed": true
+        },
+        {
+          "field": "rsi14",
+          "op": "ge",
+          "value": 45.0,
+          "actual": 70.92377545676146,
+          "passed": true
+        },
+        {
+          "field": "rsi14",
+          "op": "le",
+          "value": 75.0,
+          "actual": 70.92377545676146,
+          "passed": true
+        },
+        {
+          "field": "buy_ratio",
+          "op": "ge",
+          "value": 0.52,
+          "actual": 0.62,
+          "passed": true
+        },
+        {
+          "field": "imbalance",
+          "op": "ge",
+          "value": 0.05,
+          "actual": 0.2,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "node": "short",
+      "passed": false,
+      "checks": [
+        {
+          "field": "ema_alignment",
+          "op": "eq",
+          "value": -1.0,
+          "actual": 1,
+          "passed": false
+        },
+        {
+          "field": "macd_histogram",
+          "op": "le",
+          "value": 0.0,
+          "actual": 0.008442279991837442,
+          "passed": false
+        },
+        {
+          "field": "rsi14",
+          "op": "ge",
+          "value": 25.0,
+          "actual": 70.92377545676146,
+          "passed": true
+        },
+        {
+          "field": "rsi14",
+          "op": "le",
+          "value": 55.0,
+          "actual": 70.92377545676146,
+          "passed": false
+        },
+        {
+          "field": "buy_ratio",
+          "op": "le",
+          "value": 0.48,
+          "actual": 0.62,
+          "passed": false
+        },
+        {
+          "field": "imbalance",
+          "op": "le",
+          "value": -0.05,
+          "actual": 0.2,
+          "passed": false
+        }
+      ]
+    }
+  ],
+  "engine": "demo"
+}

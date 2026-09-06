@@ -1,0 +1,39 @@
+{
+  "version": "default-v1-unbacktested",
+  "gates": [
+    {"id": "spread", "reason_code": "wide_spread", "conditions": [{"field": "spread_bps", "op": "le", "value": 5}]},
+    {"id": "liquidity", "reason_code": "thin_liquidity", "conditions": [{"field": "min_book_notional", "op": "ge", "value": 100000}]},
+    {"id": "volatility_floor", "reason_code": "low_volatility", "conditions": [{"field": "atr_pct", "op": "ge", "value": 0.02}]},
+    {"id": "volatility_ceiling", "reason_code": "excess_volatility", "conditions": [{"field": "atr_pct", "op": "le", "value": 3}]},
+    {"id": "trend", "reason_code": "ranging", "conditions": [{"field": "trend_strength_atr", "op": "ge", "value": 0.15}]},
+    {"id": "funding", "reason_code": "extreme_funding", "conditions": [{"field": "abs_funding_rate", "op": "le", "value": 0.003}]}
+  ],
+  "long": [
+    {"field": "ema_alignment", "op": "eq", "value": 1},
+    {"field": "macd_histogram", "op": "ge", "value": 0},
+    {"field": "rsi14", "op": "ge", "value": 45},
+    {"field": "rsi14", "op": "le", "value": 75},
+    {"field": "buy_ratio", "op": "ge", "value": 0.52},
+    {"field": "imbalance", "op": "ge", "value": 0.05}
+  ],
+  "short": [
+    {"field": "ema_alignment", "op": "eq", "value": -1},
+    {"field": "macd_histogram", "op": "le", "value": 0},
+    {"field": "rsi14", "op": "ge", "value": 25},
+    {"field": "rsi14", "op": "le", "value": 55},
+    {"field": "buy_ratio", "op": "le", "value": 0.48},
+    {"field": "imbalance", "op": "le", "value": -0.05}
+  ],
+  "risk": {
+    "minimum_confidence": 0.6,
+    "min_risk_reward": 1.5,
+    "target_risk_reward": 2.0,
+    "stop_atr": 1.2,
+    "entry_half_width_atr": 0.1,
+    "stop_width_atr": 0.15,
+    "profit_width_atr": 0.5,
+    "fee_bps_per_side": 5,
+    "slippage_bps_per_side": 2,
+    "max_reference_drift_atr": 0.75
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "$defs": {
+    "PriceZone": {
+      "additionalProperties": false,
+      "properties": {
+        "low": {
+          "exclusiveMinimum": 0,
+          "title": "Low",
+          "type": "number"
+        },
+        "high": {
+          "exclusiveMinimum": 0,
+          "title": "High",
+          "type": "number"
+        }
+      },
+      "required": [
+        "low",
+        "high"
+      ],
+      "title": "PriceZone",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "symbol": {
+      "title": "Symbol",
+      "type": "string"
+    },
+    "market": {
+      "const": "binance_usdm_futures",
+      "default": "binance_usdm_futures",
+      "title": "Market",
+      "type": "string"
+    },
+    "interval": {
+      "title": "Interval",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "trade",
+        "no_trade"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "direction": {
+      "enum": [
+        "long",
+        "short",
+        "neutral"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "market_regime": {
+      "enum": [
+        "trending",
+        "ranging",
+        "unknown"
+      ],
+      "title": "Market Regime",
+      "type": "string"
+    },
+    "reason_code": {
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "generated_at": {
+      "title": "Generated At",
+      "type": "integer"
+    },
+    "data_as_of": {
+      "title": "Data As Of",
+      "type": "integer"
+    },
+    "valid_from": {
+      "title": "Valid From",
+      "type": "integer"
+    },
+    "valid_until": {
+      "title": "Valid Until",
+      "type": "integer"
+    },
+    "validity_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Validity Seconds",
+      "type": "integer"
+    },
+    "reference_price": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Price"
+    },
+    "entry_zone": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PriceZone"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "take_profit_zone": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PriceZone"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "stop_loss_zone": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PriceZone"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "risk_reward_ratio": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Risk Reward Ratio"
+    },
+    "confidence": {
+      "default": 0,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "confidence_kind": {
+      "const": "uncalibrated_assessment",
+      "default": "uncalibrated_assessment",
+      "title": "Confidence Kind",
+      "type": "string"
+    },
+    "rationale": {
+      "title": "Rationale",
+      "type": "string"
+    },
+    "risks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Risks",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "decision_path": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Decision Path",
+      "type": "array"
+    },
+    "engine": {
+      "enum": [
+        "claude",
+        "rules",
+        "demo",
+        "guard"
+      ],
+      "title": "Engine",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "symbol",
+    "interval",
+    "status",
+    "direction",
+    "market_regime",
+    "reason_code",
+    "generated_at",
+    "data_as_of",
+    "valid_from",
+    "valid_until",
+    "validity_seconds",
+    "rationale",
+    "engine"
+  ],
+  "title": "Prediction",
+  "type": "object"
+}
