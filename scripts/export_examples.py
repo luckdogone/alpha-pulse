@@ -4,9 +4,9 @@ import asyncio
 import json
 from pathlib import Path
 
-from alpha_pulse.config import Settings
-from alpha_pulse.models import Prediction
-from alpha_pulse.service import analyze
+from application.service import analyze
+from config import Settings
+from domain.models import Prediction
 
 
 async def main():

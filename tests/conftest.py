@@ -1,9 +1,9 @@
 import pytest
 
-from alpha_pulse.config import Settings
-from alpha_pulse.decision import DecisionTree
-from alpha_pulse.demo import demo_snapshot
-from alpha_pulse.evidence import EvidenceStore
+from application import demo_snapshot
+from config import Settings
+from domain.decision import DecisionTree
+from storage.evidence import EvidenceStore
 
 
 @pytest.fixture

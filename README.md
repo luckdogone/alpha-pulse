@@ -50,47 +50,58 @@ Alpha-Pulse 是一个以多金融市场为长期目标、由 AI Agent 驱动的�
 <a id="architecture"></a>
 ## 系统架构 · Architecture
 
-当前后端采用 Python 模块化结构，由 `service.py` 显式组织分析流程。数据获取、确定性计算、模型判断与输出校验各有边界，便于分别测试和替换；目前行情接口及结果契约仍与 Binance 市场绑定，通用多市场适配层需要后续建设。
+当前后端采用按职责分包的 Python 模块化结构，由 `application/service.py` 显式组织分析流程。入口、应用编排、领域规则、Agent、数据接入、证据存储和配置分别管理；目前行情接口及结果契约仍与 Binance 市场绑定，通用多市场适配层需要后续建设。详细依赖边界、迁移说明和扩展方式见 [开发架构指南](docs/architecture.md)。
 
 ```mermaid
 flowchart TB
-    Binance[Binance REST / WebSocket] --> Access[binance.py / transport.py]
-    Sources[GDELT / Coin Metrics / CoinGlass] --> External[external.py]
-    Access --> Market[market.py 快照 / indicators.py 指标]
-    Market --> Service[service.py 分析编排]
-    Market --> Evidence[evidence.py 证据存储]
+    Binance[Binance REST / WebSocket] --> Access[data/providers/binance.py / data/transport.py]
+    Sources[GDELT / Coin Metrics / CoinGlass] --> External[data/providers/external.py]
+    Access --> Market[data/market.py 快照 / domain/indicators.py 指标]
+    Market --> Service[application/service.py 分析编排]
+    Market --> Evidence[storage/evidence.py 证据存储]
     External --> Evidence
-    CLI[cli.py / Python 调用] --> Service
-    Service --> Rules[decision.py 规则与价格区间]
-    Service --> Agent[agent.py Agent 执行循环]
-    Context[context.py 上下文与证据索引] --> Agent
+    CLI[interfaces/cli.py / Python 调用] --> Service
+    Service --> Rules[domain/decision.py 规则与价格区间]
+    Service --> Agent[agent/harness.py Agent 执行循环]
+    Context[agent/context.py 上下文与证据索引] --> Agent
     Evidence --> Context
-    Agent <--> LLM[DeepSeek / Claude]
-    Agent --> Tools[tools.py 工具注册与参数校验]
+    Agent <--> LLM[agent/providers/ DeepSeek / Claude]
+    Agent --> Tools[agent/tools.py 工具注册与参数校验]
     Tools --> Market
     Tools --> External
     Tools --> Evidence
-    Rules --> Output[models.py 结果校验]
+    Rules --> Output[domain/models.py 结果校验]
     Service --> Output
     Output --> Files[JSON / runs 运行归档]
 ```
 
 | 逻辑职责 | 主要模块 | 设计目的 |
 | --- | --- | --- |
-| 数据接入 | `binance.py`、`external.py`、`transport.py` | 集中处理请求、代理、超时、重试与来源差异。 |
-| 数据处理 | `market.py`、`indicators.py`、`evidence.py` | 检查时间、完整度和数据新鲜度，保留可追溯的输入。 |
-| 分析工具 | `tools.py` | 通过有类型约束的工具暴露数据能力，避免模型直接操作任意接口。 |
-| 分析与决策 | `service.py`、`agent.py`、`context.py`、`decision.py` | 区分流程编排、工具选择、上下文管理与确定性规则。 |
-| 应用输出 | `cli.py`、`models.py` | 提供命令行、Python 和稳定的 JSON 契约；Web API 待实现。 |
+| 应用入口 | `interfaces/cli.py` | 命令解析、实时监听和结果输出；Web API 待实现。 |
+| 应用编排 | `application/service.py`、`application/demo.py` | 组织单次分析、复核、归档及离线演示。 |
+| 领域规则 | `domain/` | 数据契约、技术指标、证据质量评分、方向规则与价格区间计算。 |
+| Agent | `agent/`、`agent/providers/` | 工具调用循环、上下文预算、模型适配和输出校验。 |
+| 数据接入与适配 | `data/market.py`、`data/providers/`、`data/transport.py` | 请求数据、组装统一快照、检查覆盖范围与完整性。 |
+| 证据存储 | `storage/evidence.py` | 管理证据索引、原始数据文件和分页读取。 |
+| 配置 | `config/settings.py`、`config/default_decision_tree.json` | 环境配置与默认规则资源。 |
 
 ```text
 alpha-pulse/                    # 当前 Git 仓库
-├── src/alpha_pulse/            # 数据、规则、Agent、CLI 与配置
-│   └── default_decision_tree.json
-├── tests/                     # 数据、决策、实时流及模型适配测试
+├── src/alpha_pulse/
+│   ├── __init__.py / __main__.py
+│   ├── interfaces/            # CLI 等用户入口
+│   ├── application/           # 分析编排与离线演示
+│   ├── domain/                # 数据模型、指标、质量与决策规则
+│   ├── agent/                 # Agent 执行循环、上下文、工具
+│   │   └── providers/         # Claude / DeepSeek 模型适配
+│   ├── data/                  # 行情快照适配与 HTTP 通信
+│   │   └── providers/         # Binance 与补充数据来源
+│   ├── storage/               # 证据持久化与检索
+│   └── config/                # Settings 与默认决策树 JSON
+├── tests/                     # 按 agent/application/data/domain/interfaces 分组
 ├── examples/                  # 合成结果与 JSON Schema
 ├── scripts/export_examples.py # 示例导出
-├── docs/                      # 产品蓝图与设计提案
+├── docs/architecture.md       # 目录职责、依赖边界与扩展指南
 ├── .env.example               # 配置模板
 ├── LICENSE                    # Apache License 2.0
 └── pyproject.toml / uv.lock    # Python 依赖与锁文件
@@ -167,7 +178,7 @@ Agent Harness 是本项目的执行循环，不是多 Agent 框架。默认最�
 <a id="decision-logic"></a>
 ## 规则决策与价格行为 · Decision Logic & Price Action
 
-当前 [默认决策树](src/alpha_pulse/default_decision_tree.json) 本质上是可配置的条件检查：先过滤数据质量、点差、流动性、波动率、趋势和资金费率，再检查 EMA、MACD、RSI、主动成交与盘口方向的一致性。模型认可方向后，程序以 ATR 和风险参数构建价格区间。
+当前 [默认决策树](src/config/default_decision_tree.json) 本质上是可配置的条件检查：先过滤数据质量、点差、流动性、波动率、趋势和资金费率，再检查 EMA、MACD、RSI、主动成交与盘口方向的一致性。模型认可方向后，程序以 ATR 和风险参数构建价格区间。
 
 **Al Brooks 价格行为分析目前是规划方向，尚未完整实现。** 现有趋势特征和近期高低点，并不构成对其方法的完整实现。后续拟围绕趋势与交易区间、趋势延续与反转、突破与假突破、回调与确认、支撑阻力，以及连续 K 线的上下文关系，逐步定义可测试的市场情景。相关概念可参考 [Brooks 官方价格行为课程目录](https://www.brookstradingcourse.com/trade-forex-price-action/)。
 
@@ -284,12 +295,14 @@ Python 调用入口：
 
 ```python
 import asyncio
-from alpha_pulse.config import Settings
-from alpha_pulse.service import analyze
+from config import Settings
+from application.service import analyze
+
 
 async def main():
     result = await analyze(Settings(), symbol="BTCUSDT", interval="1m", engine="rules")
     print(result.model_dump_json(indent=2))
+
 
 asyncio.run(main())
 ```

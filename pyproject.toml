@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-alpha-pulse = "alpha_pulse.cli:main"
+alpha-pulse = "alpha_pulse.interfaces.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-asyncio>=1", "ruff>=0.12"]
@@ -26,6 +26,7 @@ dev = ["pytest>=8", "pytest-asyncio>=1", "ruff>=0.12"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py311"
@@ -38,4 +39,4 @@ select = ["E", "F", "I", "UP", "B", "ASYNC"]
 packages = ["src/alpha_pulse"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "scripts", "examples", "README.md", "pyproject.toml", "uv.lock", ".env.example", ".gitignore"]
+include = ["src", "tests", "scripts", "examples", "docs", "README.md", "pyproject.toml", "uv.lock", ".env.example", ".gitignore"]
