@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from application import demo_snapshot
+from application.demo import demo_snapshot
 from domain.decision import Condition, DecisionTree
 from domain.indicators import calculate, ema
 from domain.models import Candle, PriceZone

@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-alpha-pulse = "alpha_pulse.interfaces.cli:main"
+alpha-pulse = "interfaces.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-asyncio>=1", "ruff>=0.12"]
@@ -36,7 +36,15 @@ line-length = 100
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/alpha_pulse"]
+packages = [
+  "src/agent",
+  "src/application",
+  "src/config",
+  "src/data",
+  "src/domain",
+  "src/interfaces",
+  "src/storage",
+]
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "tests", "scripts", "examples", "docs", "README.md", "pyproject.toml", "uv.lock", ".env.example", ".gitignore"]

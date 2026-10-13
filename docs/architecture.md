@@ -5,9 +5,9 @@ Alpha-Pulse 使用按职责分包的模块化单体架构。CLI 和 Python 调�
 ## 目录职责
 
 ```text
-src/alpha_pulse/
+src/
 ├── __init__.py                 # 包信息与版本
-├── __main__.py                 # python -m alpha_pulse
+├── __main__.py                 # python src/__main__.py
 ├── interfaces/
 │   └── cli.py                  # 命令、watch 调度、输出与连接诊断
 ├── application/
@@ -41,7 +41,7 @@ src/alpha_pulse/
     └── default_decision_tree.json
 ```
 
-所有目录均为 Python 包，包含 `__init__.py`。顶层只保留包信息和模块入口，跨包导入使用 `alpha_pulse.<package>.<module>` 的绝对路径。
+业务包直接位于 `src/` 下，包含各自的 `__init__.py`。跨包导入使用 `application.service`、`domain.models` 等绝对路径。wheel 显式打包这七个业务包，安装后 CLI 通过 `interfaces.cli:main` 启动。
 
 ## 依赖边界
 
@@ -80,9 +80,9 @@ src/alpha_pulse/
 | 新增分析用例或批量任务 | 在 `application/` 增加编排，复用领域与数据组件 | `tests/application/` |
 | 更换证据存储 | 在 `storage/` 实现读写能力，在应用层装配；领域规则继续只接收证据映射 | 存储测试与 `tests/application/` |
 
-## 导入迁移
+## 导入与入口
 
-命令名、命令参数、JSON 结果契约和环境变量保持原有行为。内部 Python 导入路径随分包调整，旧的平铺模块路径不再保留；仓库内测试、脚本和 README 示例已同步迁移。
+源码采用 `src/` 下直接分包的结构。安装后使用以下导入路径；仓库内测试、脚本和 README 示例使用相同路径。
 
 ```python
 from application.service import analyze
@@ -90,23 +90,9 @@ from config import Settings
 from domain.models import Prediction
 ```
 
-| 旧路径 | 新路径 |
-| --- | --- |
-| `alpha_pulse.cli` | `alpha_pulse.interfaces.cli` |
-| `alpha_pulse.service` / `demo` | `alpha_pulse.application.service` / `demo` |
-| `alpha_pulse.models` / `decision` / `indicators` | `alpha_pulse.domain.models` / `decision` / `indicators` |
-| `alpha_pulse.evidence.EvidenceStore` | `alpha_pulse.storage.evidence.EvidenceStore` |
-| `alpha_pulse.evidence.assess_quality` | `alpha_pulse.domain.quality.assess_quality` |
-| `alpha_pulse.market` / `transport` | `alpha_pulse.data.market` / `transport` |
-| `alpha_pulse.binance` / `external` | `alpha_pulse.data.providers.binance` / `external` |
-| `alpha_pulse.agent.AgentHarness` | `alpha_pulse.agent.harness.AgentHarness` |
-| `alpha_pulse.agent.AgentError` | `alpha_pulse.agent.contracts.AgentError` |
-| `alpha_pulse.agent.ClaudeModel` / `DeepSeekModel` | `alpha_pulse.agent.providers.claude.ClaudeModel` / `deepseek.DeepSeekModel` |
-| `alpha_pulse.context` / `tools` | `alpha_pulse.agent.context` / `tools` |
-| `alpha_pulse.context.SYSTEM_PROMPT` / `dumps` | `alpha_pulse.agent.prompts.SYSTEM_PROMPT` / `alpha_pulse.agent.contracts.dumps` |
-| `alpha_pulse.config.Settings` | 保持不变，通过 `config/__init__.py` 导出 |
+命令入口为 `alpha-pulse`，模块入口为 `python -m interfaces.cli`。在项目根目录也可直接运行 `python src/__main__.py`。
 
-直接调用规则时，将 `tree.evaluate(snapshot, store)` 改为 `tree.evaluate(snapshot, store.records)`。默认规则资源移到 `src/alpha_pulse/config/default_decision_tree.json`；依赖旧文件路径的外部脚本需要同步更新，使用 `Settings.tree_file()` 的调用不受影响。
+直接调用规则时，将 `tree.evaluate(snapshot, store)` 改为 `tree.evaluate(snapshot, store.records)`。默认规则资源移到 `src/config/default_decision_tree.json`；依赖旧文件路径的外部脚本需要同步更新，使用 `Settings.tree_file()` 的调用不受影响。
 
 ## 开发与验证
 
@@ -117,7 +103,7 @@ uv run ruff check .
 uv run ruff format --check .
 uv build
 uv run alpha-pulse demo --scenario long
-uv run python -m alpha_pulse schema
+uv run python -m interfaces.cli schema
 ```
 
 `pyproject.toml` 已配置 pytest 的 `src` 搜索路径，直接通过已有虚拟环境运行 `python -m pytest` 也可定位源码。项目移动或 CLI 入口更新后，应重新执行 `uv sync --dev`，更新可编辑安装与命令脚本。

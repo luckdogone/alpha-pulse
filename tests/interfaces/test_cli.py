@@ -9,13 +9,13 @@ import pytest
 from domain.models import Prediction
 
 
-def run_cli(tmp_path, *arguments):
+def run_cli(tmp_path, *arguments, entry="module"):
     source = Path(__file__).resolve().parents[2] / "src"
+    command = ["-m", "interfaces.cli"] if entry == "module" else [str(source / "__main__.py")]
     result = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "alpha_pulse",
+            *command,
             "--env-file",
             str(tmp_path / "absent.env"),
             *arguments,
@@ -35,8 +35,9 @@ def run_cli(tmp_path, *arguments):
     return result
 
 
-def test_module_entry_point_exports_schema(tmp_path):
-    result = run_cli(tmp_path, "schema")
+@pytest.mark.parametrize("entry", ["module", "source"])
+def test_entry_point_exports_schema(tmp_path, entry):
+    result = run_cli(tmp_path, "schema", entry=entry)
     assert json.loads(result.stdout) == Prediction.model_json_schema()
 
 

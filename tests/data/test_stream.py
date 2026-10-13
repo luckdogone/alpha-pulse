@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from data import binance as module
+from data.providers import binance as module
 from data.providers.binance import Binance
 from data.transport import DataError
 

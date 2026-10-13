@@ -87,7 +87,7 @@ flowchart TB
 
 ```text
 alpha-pulse/                    # 当前 Git 仓库
-├── src/alpha_pulse/
+├── src/
 │   ├── __init__.py / __main__.py
 │   ├── interfaces/            # CLI 等用户入口
 │   ├── application/           # 分析编排与离线演示

@@ -195,3 +195,7 @@ def main():
         emit({"status": "error", "error": message})
         code = 2
     sys.exit(code)
+
+
+if __name__ == "__main__":
+    main()

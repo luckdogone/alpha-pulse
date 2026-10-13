@@ -22,7 +22,7 @@ async def test_service_fails_closed_on_provider_error(settings, monkeypatch):
 
 async def test_service_rechecks_price_after_model(settings, market_fixture, monkeypatch):
     from application import service
-    from application import demo_snapshot
+    from application.demo import demo_snapshot
 
     count = 0
 
@@ -73,7 +73,7 @@ async def test_service_rechecks_price_after_model(settings, market_fixture, monk
 
 async def test_service_uses_configured_deepseek_provider(settings, monkeypatch):
     from application import service
-    from application import demo_snapshot
+    from application.demo import demo_snapshot
     from data.market import MarketData
 
     settings.model_provider = "deepseek"

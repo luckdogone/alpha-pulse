@@ -1,6 +1,6 @@
 import pytest
 
-from application import demo_snapshot
+from application.demo import demo_snapshot
 from config import Settings
 from domain.decision import DecisionTree
 from storage.evidence import EvidenceStore
