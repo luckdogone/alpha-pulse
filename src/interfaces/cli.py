@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import contextlib
 import json
 import logging
 import sys
@@ -10,6 +9,7 @@ from application.service import analyze
 from config import Settings
 from data.errors import DataError
 from data.ingestion.providers.binance import Binance
+from data.ingestion.streaming import LiveMarket
 from data.ingestion.transport import JsonHTTP
 from domain.models import INTERVAL_MS, INTERVALS, Prediction, normalize_symbol
 
@@ -60,34 +60,16 @@ def emit(value, output: Path | None = None, *, compact: bool = False):
 
 
 async def watch(settings: Settings, binance: Binance, args):
-    queue: asyncio.Queue = asyncio.Queue(maxsize=1)
-
-    async def produce():
-        try:
-            async for event in binance.stream(args.symbol, args.interval):
-                if event["candle"]["closed"]:
-                    if queue.full():
-                        queue.get_nowait()
-                    await queue.put(event)
-        except Exception as exc:
-            if queue.full():
-                queue.get_nowait()
-            await queue.put(exc)
-
-    task = asyncio.create_task(produce())
-    try:
+    # Both routed connections remain active while a model analyzes the previous close.
+    async with LiveMarket(binance, args.symbol, args.interval) as live:
         count = 0
         while args.count == 0 or count < args.count:
-            event = await queue.get()
-            if isinstance(event, Exception):
-                raise event
-            # Only one analysis at a time; a bounded queue coalesces closes during slow model calls.
-            emit(await analyze(settings, args.symbol, args.interval, args.engine), compact=True)
+            await live.next_close()
+            emit(
+                await analyze(settings, args.symbol, args.interval, args.engine, live=live),
+                compact=True,
+            )
             count += 1
-    finally:
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
 
 
 async def run(args) -> int:

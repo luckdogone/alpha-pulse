@@ -103,7 +103,7 @@ from domain.models import Prediction
 
 ### 数据层迁移
 
-数据层按实际功能拆分，未新增算法或改变 CLI、Snapshot、Evidence 和 Prediction 的 JSON 结构。波动相关指标仍在 `processing/indicators.py` 中，暂未单独拆出 `volatility.py`；`processing/derivatives.py` 当前处理爆仓金额汇总，OI、资金费率和多空比保留已有数据及摘要语义。
+数据层按实际功能拆分，并扩展了 Binance 采集窗口、实时状态和特征契约。波动指标继续集中在 `processing/indicators.py`；`processing/derivatives.py` 负责 OI、账户结构、资金费率和爆仓统计。`Snapshot` 新增 `features`、`feature_quality_status`、`feature_metadata`、`data_quality`、交易规则及校准时差等字段；`Evidence` 新增时差元数据。CLI 命令与 Prediction 顶层结构保持兼容，具体字段和计算口径见 [数据契约](data-contract.md)。
 
 旧内部模块已移除，直接使用 Python 内部接口的脚本需更新导入：
 
@@ -117,7 +117,9 @@ from domain.models import Prediction
 | `domain.quality.assess_quality` | `data.quality.scoring.assess_quality` |
 | `Candle.from_rest()` / `Candle.from_ws()` | `data.cleaning.candles.from_rest()` / `from_ws()` |
 
-`Binance.depth()` 与 `Binance.trades()` 现在返回原始响应；需要处理后的盘口或订单流时，使用 `MarketData.order_book()` / `order_flow()`，其 Evidence 的 `data` 和 `summary` 保持原有结构。`EvidenceStore.add()` 的调用方式保持不变。
+`Binance.depth()` 返回原始盘口；`Binance.trades()` 返回含 `trades`、窗口边界、连续性和分页截断标记的对象。需要加工后的盘口或订单流时，使用 `MarketData.order_book()` / `order_flow()`。其摘要保留原有规则使用的字段，并增加新特征和覆盖信息；`EvidenceStore.add()` 增加可选时差参数。历史 `INDICATOR_WARMUP_CANDLES=250` 配置需改为至少 `251`。
+
+`ingestion/streaming.py` 管理双路订阅、周期刷新和恢复；`ingestion/state.py` 管理订单簿序号及滚动成交状态；`ingestion/clock.py` 估计服务器时差。`catalog.py` 定义衍生品接口、时间窗口、刷新频率和优先级。`quality/features.py` 判断特征依赖的证据是否有效，`assembly/features.py` 负责计算结果、单位与证据 ID 的绑定。
 
 ## 开发与验证
 

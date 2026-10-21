@@ -15,6 +15,7 @@ def clean_trades(raw: list[dict]) -> list[dict]:
                 "quantity": number(row["q"], nonnegative=True),
                 "timestamp": row["T"],
                 "buyer_maker": row["m"],
+                "id": int(row["a"]) if "a" in row else None,
             }
         )
-    return rows
+    return sorted(rows, key=lambda row: (row["timestamp"], row["id"] or 0))

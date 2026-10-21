@@ -6,7 +6,7 @@ from pydantic import Field, field_validator, model_validator
 from data.errors import DataError
 from data.pipeline import ExternalData, MarketData
 from data.quality.scoring import assess_quality
-from domain.models import INTERVALS, Evidence, Model, normalize_symbol
+from domain.models import INTERVALS, Evidence, Model, normalize_symbol, now_ms
 from storage.evidence import EvidenceStore
 
 
@@ -96,8 +96,9 @@ TOOL_INFO = {
     ),
     "get_order_flow": (
         SymbolArgs,
-        "Refresh the latest 500 aggregate trades when checking actual taker buying/selling. "
-        "The sample has variable duration, not a guaranteed 30-minute total.",
+        "Refresh the configured 1–5 minute aggregate-trade window "
+        "when checking taker buying/selling. "
+        "Pagination, coverage and continuity are explicit; missing windows are not zero flow.",
     ),
     "get_derivatives": (
         SymbolArgs,
@@ -219,7 +220,11 @@ class ToolRegistry:
             return {
                 "evidence_id": item.id,
                 "quality": assess_quality(
-                    item.source, item.observed_at, item.ttl_ms, item.status
+                    item.source,
+                    item.observed_at,
+                    item.ttl_ms,
+                    item.status,
+                    now_ms() + item.clock_offset_ms,
                 ).model_dump(),
             }
         if name == "read_evidence":

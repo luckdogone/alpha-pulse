@@ -13,6 +13,8 @@ def clean_order_book(raw: dict) -> dict:
         raise DataError("invalid or crossed order book")
     return {
         "observed_at": raw.get("E", raw.get("T")),
+        "event_time": raw.get("E"),
+        "transaction_time": raw.get("T"),
         "last_update_id": raw["lastUpdateId"],
         "bids": bids,
         "asks": asks,

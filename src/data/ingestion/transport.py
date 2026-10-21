@@ -21,6 +21,7 @@ async def stream_json(
     open_timeout: float,
     decode: Callable[[dict], dict | None],
     stream_name: str,
+    on_disconnect: Callable[[], None] | None = None,
 ) -> AsyncIterator[dict]:
     """Reconnect boundedly; only accepted messages reset consecutive failures.
 
@@ -51,6 +52,8 @@ async def stream_json(
                     failures = 0
                     yield event
         except (OSError, TimeoutError, WebSocketException, ValueError, KeyError) as exc:
+            if on_disconnect:
+                on_disconnect()
             failures += 1
             log.warning(
                 "%s stream interrupted (%s), attempt %d/6",

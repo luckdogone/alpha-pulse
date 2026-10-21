@@ -13,6 +13,7 @@ from application.demo import demo_snapshot
 from config import Settings
 from data.errors import DataError
 from data.ingestion.providers.binance import Binance
+from data.ingestion.streaming import LiveMarket
 from data.ingestion.transport import JsonHTTP
 from data.pipeline import ExternalData, MarketData
 from domain.decision import Decision, DecisionTree
@@ -42,7 +43,7 @@ def prediction(
     reason_code: str = "insufficient_data",
     rationale: str = "数据不足，暂无合适时机。",
 ) -> Prediction:
-    at = now_ms()
+    at = now_ms() + (snapshot.server_time_offset_ms if snapshot else 0)
     trade = zones is not None
     if decision and reason_code == "insufficient_data" and not snapshot.problems:
         reason_code = decision.reason_code
@@ -51,7 +52,7 @@ def prediction(
     validity = settings.analysis_validity_minutes * 60
     evidence = []
     cited = set(assessment.evidence_ids if assessment and engine in {"claude", "deepseek"} else [])
-    for row in store.ledger(at):
+    for row in store.ledger():
         evidence.append(
             {k: row[k] for k in ("id", "tool", "source", "status", "observed_at", "quality")}
             | {"cited_by_model": row["id"] in cited}
@@ -89,6 +90,7 @@ async def analyze(
     interval: str = "1m",
     engine: str | None = None,
     scenario: str = "long",
+    live: LiveMarket | None = None,
 ) -> Prediction:
     symbol = normalize_symbol(symbol)
     engine = engine or settings.model_provider
@@ -105,8 +107,8 @@ async def analyze(
         JsonHTTP(settings.proxy(binance=True), settings.request_timeout_seconds),
         JsonHTTP(settings.proxy(), settings.request_timeout_seconds),
     )
-    binance = Binance(settings, http)
-    market = MarketData(settings, binance, store)
+    binance = live.binance if live else Binance(settings, http)
+    market = MarketData(settings, binance, store, live=live)
     external = ExternalData(settings, external_http, store)
     model = None
     snapshot = None

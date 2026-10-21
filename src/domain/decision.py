@@ -91,7 +91,7 @@ class DecisionTree:
         *,
         synthetic: bool = False,
     ) -> Decision:
-        at = at or now_ms()
+        at = (now_ms() if at is None else at) + snapshot.server_time_offset_ms
         problems = list(snapshot.problems)
         if not snapshot.required_ids:
             problems.append("no required evidence")

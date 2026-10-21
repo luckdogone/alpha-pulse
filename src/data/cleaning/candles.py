@@ -17,6 +17,7 @@ def from_rest(row: list[Any], at: int) -> "Candle":
         quote_volume=row[7],
         trades=row[8],
         taker_buy_volume=row[9],
+        taker_buy_quote_volume=row[10] if len(row) > 10 else None,
         closed=row[6] < at,
     )
 
@@ -33,6 +34,7 @@ def from_ws(row: dict[str, Any]) -> "Candle":
         quote_volume=row["q"],
         trades=row["n"],
         taker_buy_volume=row["V"],
+        taker_buy_quote_volume=row.get("Q"),
         closed=row["x"],
     )
 

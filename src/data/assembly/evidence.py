@@ -17,6 +17,7 @@ def build_evidence(
     data: Any = None,
     status: str = "ok",
     error: str | None = None,
+    clock_offset_ms: int = 0,
 ) -> Evidence:
     at = now_ms()
     # Pydantic's Any payloads otherwise allow non-finite values through nested containers.
@@ -29,7 +30,8 @@ def build_evidence(
         fetched_at=at,
         observed_at=observed_at,
         ttl_ms=ttl_ms,
-        quality=assess_quality(source, observed_at, ttl_ms, status, at),
+        clock_offset_ms=clock_offset_ms,
+        quality=assess_quality(source, observed_at, ttl_ms, status, at + clock_offset_ms),
         summary=summary,
         data=data,
         status=status,

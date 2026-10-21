@@ -24,9 +24,23 @@ class Settings(BaseSettings):
     https_proxy: str | None = None
     all_proxy: str | None = None
     binance_proxy: str | None = None
+    binance_api_key: SecretStr | None = None
     binance_rest_base_url: str = "https://fapi.binance.com"
     binance_ws_url_template: str = "wss://fstream.binance.com/market/ws/{symbol}@kline_{interval}"
     binance_ws_fallback_url_template: str | None = None
+    binance_ws_market_url: str = "wss://fstream.binance.com/market/stream"
+    binance_ws_public_url: str = "wss://fstream.binance.com/public/stream"
+    exchange_info_refresh_seconds: int = Field(default=3600, ge=60)
+    clock_refresh_seconds: int = Field(default=300, ge=10)
+    clock_samples: int = Field(default=3, ge=1, le=10)
+    trade_window_minutes: int = Field(default=5, ge=1, le=5)
+    trade_max_pages: int = Field(default=100, ge=1, le=1000)
+    depth_limit: Literal[100, 500] = 100
+    slippage_notional_usdt: float = Field(default=10_000, gt=0)
+    realtime_stale_ms: int = Field(default=5000, ge=1000, le=30_000)
+    enable_p2_features: bool = False
+    higher_timeframes: list[Literal["1h", "4h"]] = Field(default_factory=lambda: ["1h", "4h"])
+    higher_timeframe_candles: int = Field(default=120, ge=100, le=150)
     coinglass_api_key: SecretStr | None = None
     coinglass_base_url: str = "https://open-api-v4.coinglass.com"
     coinglass_exchanges: str = "Binance,OKX,Bybit"
@@ -35,7 +49,7 @@ class Settings(BaseSettings):
     coinmetrics_base_url: str = "https://community-api.coinmetrics.io/v4"
     news_domains: str = "reuters.com,apnews.com,bloomberg.com,ft.com,bbc.com,coindesk.com"
     snapshot_minutes: int = Field(default=30, ge=30, le=120)
-    indicator_warmup_candles: int = Field(default=250, ge=60, le=1000)
+    indicator_warmup_candles: int = Field(default=251, ge=251, le=1000)
     analysis_validity_minutes: int = Field(default=30, ge=1, le=120)
     request_timeout_seconds: float = Field(default=10, ge=1, le=60)
     analysis_timeout_seconds: float = Field(default=180, ge=10, le=600)

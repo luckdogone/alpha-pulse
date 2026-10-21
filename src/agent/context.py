@@ -28,6 +28,11 @@ class ContextWindow:
 
     def messages(self, note: str = "") -> list[dict]:
         s = self.snapshot
+
+        def qualified(value, source):
+            state = s.data_quality.get("sources", {}).get(source, {}).get("status", "VALID")
+            return value if state == "VALID" else {"quality_status": state}
+
         ledger = [
             {
                 k: row[k]
@@ -58,10 +63,27 @@ class ContextWindow:
             "decision_tree": self.tree,
             "tree_evaluation": self.decision.model_dump(),
             "market_snapshot": {
-                "indicators": s.indicators,
-                "order_book": s.order_book,
-                "order_flow": s.order_flow,
-                "derivatives": s.derivatives,
+                "indicators": qualified(s.indicators, "get_klines"),
+                "order_book": qualified(s.order_book, "get_order_book"),
+                "order_flow": qualified(s.order_flow, "get_order_flow"),
+                "derivatives": {
+                    name: qualified(summary, "get_" + name)
+                    for name, summary in s.derivatives.items()
+                },
+                "features": {
+                    name: value
+                    for name, value in s.features.items()
+                    if s.feature_quality_status.get(name) == "VALID"
+                },
+                "feature_quality_status": s.feature_quality_status,
+                "data_quality": s.data_quality,
+                "feature_policy": (
+                    "Only VALID features may support a claim. "
+                    "STALE/MISSING/INVALID are unavailable, "
+                    "never zero. CVD is base volume; OI changes are fractions; "
+                    "funding history is settled, "
+                    "current funding is published. Force-order amounts are observed samples only."
+                ),
                 "kline_columns": [
                     "open_time_ms",
                     "open",
@@ -71,8 +93,8 @@ class ContextWindow:
                     "volume",
                     "closed",
                 ],
-                "recent_1m": candle_rows(s.recent_1m),
-                "recent_analysis_interval": candle_rows(s.candles[-8:]),
+                "recent_1m": qualified(candle_rows(s.recent_1m), "get_recent_1m"),
+                "recent_analysis_interval": qualified(candle_rows(s.candles[-8:]), "get_klines"),
                 "problems": s.problems,
                 "required_evidence_ids": s.required_ids,
             },

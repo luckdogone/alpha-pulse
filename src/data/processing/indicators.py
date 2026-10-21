@@ -46,6 +46,7 @@ def calculate(candles: list[Candle]) -> dict:
     # Rolling VWAP from exchange quote/base volume, not a session-anchored VWAP.
     vwap = sum(r.quote_volume for r in rows[-30:]) / volume if volume else None
     avg_volume = mean(r.volume for r in rows[-21:-1])
+    avg_trades = mean(r.trades for r in rows[-21:-1])
     return {
         "source": "locally_computed_from_binance_closed_klines",
         "closed_candles": len(rows),
@@ -66,8 +67,10 @@ def calculate(candles: list[Candle]) -> dict:
         "bollinger_upper": middle + 2 * std,
         "bollinger_lower": middle - 2 * std,
         "bollinger_width_pct": 4 * std / middle * 100,
+        "bollinger_bandwidth": 4 * std / middle,
         "rolling_vwap30": vwap,
-        "volume_ratio20": rows[-1].volume / avg_volume if avg_volume else 0,
-        "support20": min(r.low for r in rows[-20:]),
-        "resistance20": max(r.high for r in rows[-20:]),
+        "volume_ratio20": rows[-1].volume / avg_volume if avg_volume else None,
+        "trade_count_ratio20": rows[-1].trades / avg_trades if avg_trades else None,
+        "support20": min(r.low for r in rows[-21:-1]),
+        "resistance20": max(r.high for r in rows[-21:-1]),
     }

@@ -49,6 +49,7 @@ class Candle(Model):
     quote_volume: float = Field(ge=0)
     trades: int = Field(ge=0)
     taker_buy_volume: float = Field(ge=0)
+    taker_buy_quote_volume: float | None = Field(default=None, ge=0)
     closed: bool
 
     @model_validator(mode="after")
@@ -57,6 +58,11 @@ class Candle(Model):
             raise ValueError("invalid OHLC ordering")
         if self.close_time < self.open_time or self.taker_buy_volume > self.volume * 1.000001:
             raise ValueError("invalid candle time/volume")
+        if (
+            self.taker_buy_quote_volume is not None
+            and self.taker_buy_quote_volume > self.quote_volume * 1.000001
+        ):
+            raise ValueError("invalid taker quote volume")
         return self
 
 
@@ -76,6 +82,7 @@ class Evidence(Model):
     fetched_at: int
     observed_at: int | None
     ttl_ms: int
+    clock_offset_ms: int = 0
     quality: Quality
     summary: dict[str, Any]
     data: Any = None
@@ -100,6 +107,15 @@ class Snapshot(Model):
     derivatives: dict[str, Any]
     evidence_ids: list[str]
     required_ids: list[str]
+    server_time_offset_ms: int = 0
+    trading_rules: dict[str, Any] = Field(default_factory=dict)
+    higher_timeframes: dict[str, Any] = Field(default_factory=dict)
+    features: dict[str, Any] = Field(default_factory=dict)
+    feature_quality_status: dict[str, Literal["VALID", "STALE", "MISSING", "INVALID"]] = Field(
+        default_factory=dict
+    )
+    feature_metadata: dict[str, Any] = Field(default_factory=dict)
+    data_quality: dict[str, Any] = Field(default_factory=dict)
     problems: list[str] = Field(default_factory=list)
 
 

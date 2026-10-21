@@ -1,13 +1,15 @@
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from config import Settings
 from data.errors import DataError
-from data.ingestion.providers.binance import STATISTICS, Binance
+from data.ingestion.providers.binance import Binance
 from data.ingestion.transport import JsonHTTP
 from data.pipeline import ExternalData, MarketData
 from domain.models import now_ms
 from storage.evidence import EvidenceStore
+from tests.data.fixtures import binance_response
 
 
 def rest_candle(start):
@@ -67,9 +69,10 @@ async def test_klines_limit_and_gaps_are_explicit(settings):
 
 
 async def test_taker_flow_uses_buyer_maker_as_sell(settings):
+    at = now_ms()
     rows = [
-        {"p": "10", "q": "3", "T": 1000, "m": False},
-        {"p": "10", "q": "1", "T": 1001, "m": True},
+        {"a": 1, "p": "10", "q": "3", "T": at - 2, "m": False},
+        {"a": 2, "p": "10", "q": "1", "T": at - 1, "m": True},
     ]
     http = JsonHTTP(None, transport=httpx.MockTransport(lambda _: httpx.Response(200, json=rows)))
     try:
@@ -273,51 +276,14 @@ def test_lowercase_proxy_config_and_env_precedence(tmp_path, monkeypatch):
 async def test_snapshot_loads_half_hour_even_with_hourly_analysis(settings, failed_path, problem):
     now = now_ms()
     required_paths = []
+    settings.binance_api_key = SecretStr("test-key")
 
     def handler(request):
-        path, params = request.url.path, request.url.params
+        path = request.url.path
         required_paths.append(path)
         if path == failed_path:
             return httpx.Response(403, json={"secret": "must not leak"})
-        if path.endswith("exchangeInfo"):
-            data = {
-                "symbols": [
-                    {
-                        "symbol": "BTCUSDT",
-                        "status": "TRADING",
-                        "contractType": "PERPETUAL",
-                        "baseAsset": "BTC",
-                        "quoteAsset": "USDT",
-                        "filters": [{"filterType": "PRICE_FILTER", "tickSize": "0.1"}],
-                    }
-                ]
-            }
-        elif path.endswith("/time"):
-            data = {"serverTime": now}
-        elif path.endswith("/klines"):
-            interval_ms = 60_000 if params["interval"] == "1m" else 3_600_000
-            count = int(params["limit"])
-            start = now // interval_ms * interval_ms - (count - 1) * interval_ms
-            data = [rest_candle(start + i * interval_ms) for i in range(count)]
-            for row in data:
-                row[6] = row[0] + interval_ms - 1
-        elif path.endswith("/depth"):
-            data = {
-                "E": now,
-                "lastUpdateId": 1,
-                "bids": [["100", "1000"]],
-                "asks": [["100.1", "1000"]],
-            }
-        elif path.endswith("/aggTrades"):
-            data = [{"p": "100", "q": "1", "T": now, "m": False}]
-        elif path.endswith("/premiumIndex"):
-            data = {"time": now, "lastFundingRate": ".0001", "markPrice": "100"}
-        elif path.endswith("/openInterest"):
-            data = {"time": now, "openInterest": "1000"}
-        elif path in STATISTICS.values():
-            data = [{"timestamp": now, "value": "1"}]
-        else:
-            pytest.fail(path)
+        data = binance_response(request, now)
         return httpx.Response(200, json=data)
 
     http = JsonHTTP(None, transport=httpx.MockTransport(handler))
@@ -331,9 +297,16 @@ async def test_snapshot_loads_half_hour_even_with_hourly_analysis(settings, fail
         assert snapshot.problems == ([problem] if problem else [])
         if failed_path:
             errors = [r for r in store.records.values() if r.status == "error"]
-            assert len(errors) == 1
+            assert len(errors) == (2 if failed_path.endswith("openInterestHist") else 1)
             assert "must not leak" not in errors[0].model_dump_json()
         assert len(snapshot.required_ids) == 6
-        assert len(snapshot.evidence_ids) == 11
+        assert len(snapshot.evidence_ids) == 15
+        assert all(c.closed for c in snapshot.candles + snapshot.recent_1m)
+        assert snapshot.trading_rules["step_size"] == "0.001"
+        assert snapshot.feature_quality_status["vwap_30m"] == "VALID"
+        assert snapshot.features["vwap_30m"] == 100.5
+        if failed_path != "/futures/data/openInterestHist":
+            assert snapshot.feature_quality_status["oi_change_24h"] == "VALID"
+            assert snapshot.features["oi_change_24h"] == pytest.approx(24 / 1001)
     finally:
         await http.close()

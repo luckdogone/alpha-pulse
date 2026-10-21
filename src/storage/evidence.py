@@ -4,7 +4,7 @@ from typing import Any
 
 from data.assembly.evidence import build_evidence
 from data.quality.scoring import assess_quality
-from domain.models import Evidence
+from domain.models import Evidence, now_ms
 
 
 class EvidenceStore:
@@ -26,6 +26,7 @@ class EvidenceStore:
         data: Any = None,
         status: str = "ok",
         error: str | None = None,
+        clock_offset_ms: int = 0,
     ) -> Evidence:
         evidence = build_evidence(
             tool=tool,
@@ -37,6 +38,7 @@ class EvidenceStore:
             data=data,
             status=status,
             error=error,
+            clock_offset_ms=clock_offset_ms,
         )
         self.records[evidence.id] = evidence
         if self.directory:
@@ -50,7 +52,11 @@ class EvidenceStore:
         for evidence in self.records.values():
             item = evidence.compact()
             item["quality"] = assess_quality(
-                evidence.source, evidence.observed_at, evidence.ttl_ms, evidence.status, at
+                evidence.source,
+                evidence.observed_at,
+                evidence.ttl_ms,
+                evidence.status,
+                (now_ms() if at is None else at) + evidence.clock_offset_ms,
             ).model_dump()
             out.append(item)
         return out

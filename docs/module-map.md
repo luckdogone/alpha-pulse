@@ -77,6 +77,9 @@ alpha-pulse/
 │   ├── data/                   # 数据处理与流水线
 │   │   ├── ingestion/          # 采集层
 │   │   │   ├── transport.py   # HTTP / WebSocket、代理、超时、重试和并发限制
+│   │   │   ├── clock.py      # 服务器时差采样及校准缓存
+│   │   │   ├── state.py      # 盘口更新序号与成交窗口连续性
+│   │   │   ├── streaming.py  # 双路订阅、周期刷新、补数与重建
 │   │   │   └── providers/     # 数据源请求与协议适配
 │   │   │       ├── binance.py # K 线分页、盘口、成交、衍生品、元数据、实时事件
 │   │   │       └── external.py # GDELT、Coin Metrics、CoinGlass 和配置链上接口
@@ -89,18 +92,21 @@ alpha-pulse/
 │   │   │   └── numeric.py     # 有限数值及正负范围校验
 │   │   ├── processing/         # 数据加工层
 │   │   │   ├── indicators.py  # EMA、RSI、MACD、ATR、布林带和 VWAP
-│   │   │   ├── orderflow.py   # 主动买卖金额、买入比例与样本时间范围
+│   │   │   ├── orderflow.py   # 分钟主动买卖、CVD、成交密度与量价背离
 │   │   │   ├── liquidity.py   # 价差、中间价、可见深度与盘口不平衡度
-│   │   │   └── derivatives.py # 多空爆仓金额汇总
+│   │   │   └── derivatives.py # OI、账户结构、资金费率、拥挤评分与爆仓汇总
 │   │   ├── quality/            # 质量评估层
 │   │   │   ├── freshness.py   # 观测时间、延迟和 K 线时效
 │   │   │   ├── completeness.py # 最近窗口覆盖、必需证据和数据状态
+│   │   │   ├── features.py    # VALID / STALE / MISSING / INVALID 与证据依赖
 │   │   │   └── scoring.py     # 来源可信度、时效和完整程度综合评分
 │   │   ├── assembly/           # 数据组装层
 │   │   │   ├── snapshot.py    # 统一 Snapshot 和问题清单
+│   │   │   ├── features.py    # 特征装配、单位及来源元数据
 │   │   │   ├── evidence.py    # Evidence 编号、元数据、质量与载荷校验
 │   │   │   ├── market.py      # K 线和衍生品证据摘要
 │   │   │   └── external.py    # 新闻、链上和爆仓证据摘要
+│   │   ├── catalog.py         # 接口、采集窗口、刷新频率与优先级
 │   │   ├── pipeline.py        # MarketData / ExternalData 组织采集、处理和保存
 │   │   └── errors.py          # 各数据模块共用的脱敏异常
 │   │
