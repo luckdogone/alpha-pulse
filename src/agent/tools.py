@@ -3,11 +3,10 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from data.market import MarketData
-from data.providers.external import ExternalData
-from data.transport import DataError
+from data.errors import DataError
+from data.pipeline import ExternalData, MarketData
+from data.quality.scoring import assess_quality
 from domain.models import INTERVALS, Evidence, Model, normalize_symbol
-from domain.quality import assess_quality
 from storage.evidence import EvidenceStore
 
 

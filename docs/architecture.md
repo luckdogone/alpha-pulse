@@ -1,5 +1,7 @@
 # 开发架构指南
 
+首次了解项目可以先阅读 [模块分层与目录说明](module-map.md)，按“模块 → 子职责 → 实际文件”查看全貌。
+
 Alpha-Pulse 使用按职责分包的模块化单体架构。CLI 和 Python 调用共享同一条分析流程；规则决定方向资格和价格区间，Agent 按需补充证据，应用层负责最终复核与归档。
 
 ## 目录职责
@@ -15,8 +17,6 @@ src/
 │   └── demo.py                 # 离线合成行情
 ├── domain/
 │   ├── models.py               # Candle / Evidence / Snapshot / Assessment / Prediction
-│   ├── indicators.py           # 已收盘 K 线的指标计算
-│   ├── quality.py              # 来源、新鲜度、完整性的质量评分
 │   └── decision.py             # 规则配置模型、方向评估、价格区间
 ├── agent/
 │   ├── harness.py              # 有轮次和工具预算的模型执行循环
@@ -28,11 +28,15 @@ src/
 │       ├── claude.py           # Claude SDK 请求与错误映射
 │       └── deepseek.py         # DeepSeek Anthropic 兼容接口适配
 ├── data/
-│   ├── market.py               # 行情汇总、快照适配、覆盖范围检查
-│   ├── transport.py            # HTTP、代理、重试和并发控制
-│   └── providers/
-│       ├── binance.py          # Binance REST / WebSocket 与原始数据解析
-│       └── external.py         # 新闻、链上、爆仓数据接入与证据封装
+│   ├── ingestion/
+│   │   ├── transport.py        # HTTP / WebSocket、代理、超时、重试、并发限制
+│   │   └── providers/          # Binance、GDELT、Coin Metrics、CoinGlass 请求适配
+│   ├── cleaning/              # K 线、盘口、成交、衍生品及外部数据校验与标准化
+│   ├── processing/            # 指标、订单流、流动性、爆仓统计
+│   ├── quality/               # 时效性、完整性与来源质量评分
+│   ├── assembly/              # 行情与外部证据摘要、Evidence、Snapshot 组装
+│   ├── pipeline.py            # MarketData / ExternalData：并发采集、处理、降级与保存
+│   └── errors.py              # 数据层共用的脱敏异常
 ├── storage/
 │   └── evidence.py             # 内存索引、JSON 文件存储、原始证据分页
 └── config/
@@ -50,8 +54,10 @@ src/
 - `agent/harness.py` 通过传入模型的 `complete()` 方法调用 LLM，不导入具体模型提供方。模型由应用层选择，调用结束后由应用层关闭。
 - `agent/providers` 负责模型协议差异，依赖共享提示词和输出契约，不依赖执行循环或应用编排。DeepSeek 目前保留对 Claude 适配器的继承，复用兼容协议的流式请求与错误处理；此次未修改 SDK 行为。
 - `agent/tools.py` 将 `data` 和 `storage` 的能力暴露给模型，校验参数并限制调用预算。
-- `data` 对接外部接口，将结果组织为 `domain` 中的模型，并通过 `storage` 记录证据。`market.py` 负责快照适配；补充数据的证据封装仍在 `providers/external.py` 中。
-- `storage` 依赖 `domain.models` 和 `domain.quality`，负责保存、索引及检索。
+- `data/pipeline.py` 编排采集、清洗、加工和组装，通过 `storage` 保存证据。`MarketData` 提供基础行情与快照，`ExternalData` 提供新闻、爆仓和链上补充证据。
+- `data/ingestion` 管理外部请求、分页和协议。Binance K 线分页调用 `cleaning/candles.py` 做规范化、去重和排序，因为分页游标依赖 K 线时间；盘口和成交请求返回原始响应，由流水线清洗、加工。WebSocket 传输负责重连，提供方负责事件过滤和跨重连去重。
+- `data/cleaning`、`processing`、`quality`、`assembly` 不发起网络请求，也不依赖具体存储类。清洗保留来源字段和单位，加工计算特征，质量模块检查覆盖及时间，组装层生成摘要和共享模型。
+- `storage` 负责内存索引、JSON 保存和分页检索；`add()` 委托 `data/assembly/evidence.py` 创建证据，`ledger()` 委托 `data/quality/scoring.py` 重新评分。组装层不反向依赖存储，避免循环导入。
 - `domain` 不导入 Agent、外部数据客户端、应用编排或具体存储类。`DecisionTree.evaluate()` 接收 `Mapping[str, Evidence]`，只读访问证据；规则配置文件的读取仍由 `DecisionTree` 构造函数完成。
 - `config` 不依赖业务包。默认规则随 Python 包发布，其路径相对于 `settings.py` 定位，支持通过 `DECISION_TREE_PATH` 覆盖。
 
@@ -60,7 +66,7 @@ src/
 ## 分析链路
 
 1. `interfaces/cli.py` 或 Python 调用进入 `application/service.py:analyze()`。
-2. `data/market.py` 获取基础行情，调用领域指标计算并记录证据。
+2. `data/pipeline.py` 通过 `ingestion` 获取基础行情，调用 `cleaning`、`processing`、`quality` 和 `assembly`，记录证据并返回统一快照。
 3. `domain/decision.py` 检查必需数据和方向条件；必需数据不合格时直接返回观望。
 4. 模型模式下，`agent/harness.py` 组织多轮分析，通过工具补充证据并校验 Assessment。
 5. 应用层检查方向与评分，刷新必要行情并重新运行规则，避免发布过期信号。
@@ -72,8 +78,9 @@ src/
 
 | 扩展内容 | 代码位置与集成方式 | 对应测试 |
 | --- | --- | --- |
-| 新增行情或补充数据来源 | 在 `data/providers/` 增加提供方；在 `data/market.py` 或提供方中适配为现有契约；需要 AI 主动查询时再注册工具 | `tests/data/` |
-| 新增技术指标或规则 | 在 `domain/indicators.py`、`domain/decision.py` 实现，按需调整默认规则 JSON | `tests/domain/` |
+| 新增行情或补充数据来源 | 在 `data/ingestion/providers/` 增加请求适配，按职责补充清洗、加工和组装，在 `data/pipeline.py` 接入；需要 AI 主动查询时再注册工具 | `tests/data/` |
+| 新增技术指标 | 在 `data/processing/` 实现，通过组装层加入摘要或快照 | `tests/data/` |
+| 新增交易规则 | 在 `domain/decision.py` 实现，按需调整默认规则 JSON | `tests/domain/` |
 | 新增模型提供方 | 在 `agent/providers/` 实现 `complete(messages, tools, *, final)` 与 `close()`，并在配置和应用装配处接入；当前 Harness 仍要求兼容的消息块与响应属性 | `tests/agent/`、`tests/application/` |
 | 新增 Agent 工具 | 在 `agent/tools.py` 增加参数模型、定义和分发；业务数据处理放在数据层 | `tests/agent/` |
 | 新增 HTTP API | 在 `interfaces/` 增加入口，复用 `application/service.py:analyze()` | `tests/interfaces/` |
@@ -93,6 +100,24 @@ from domain.models import Prediction
 命令入口为 `alpha-pulse`，模块入口为 `python -m interfaces.cli`。在项目根目录也可直接运行 `python src/__main__.py`。
 
 直接调用规则时，将 `tree.evaluate(snapshot, store)` 改为 `tree.evaluate(snapshot, store.records)`。默认规则资源移到 `src/config/default_decision_tree.json`；依赖旧文件路径的外部脚本需要同步更新，使用 `Settings.tree_file()` 的调用不受影响。
+
+### 数据层迁移
+
+数据层按实际功能拆分，未新增算法或改变 CLI、Snapshot、Evidence 和 Prediction 的 JSON 结构。波动相关指标仍在 `processing/indicators.py` 中，暂未单独拆出 `volatility.py`；`processing/derivatives.py` 当前处理爆仓金额汇总，OI、资金费率和多空比保留已有数据及摘要语义。
+
+旧内部模块已移除，直接使用 Python 内部接口的脚本需更新导入：
+
+| 原入口 | 当前入口 |
+| --- | --- |
+| `data.market.MarketData` | `data.pipeline.MarketData` |
+| `data.providers.external.ExternalData` | `data.pipeline.ExternalData` |
+| `data.providers.binance.Binance` | `data.ingestion.providers.binance.Binance` |
+| `data.transport.JsonHTTP` / `DataError` | `data.ingestion.transport.JsonHTTP` / `data.errors.DataError` |
+| `domain.indicators` | `data.processing.indicators` |
+| `domain.quality.assess_quality` | `data.quality.scoring.assess_quality` |
+| `Candle.from_rest()` / `Candle.from_ws()` | `data.cleaning.candles.from_rest()` / `from_ws()` |
+
+`Binance.depth()` 与 `Binance.trades()` 现在返回原始响应；需要处理后的盘口或订单流时，使用 `MarketData.order_book()` / `order_flow()`，其 Evidence 的 `data` 和 `summary` 保持原有结构。`EvidenceStore.add()` 的调用方式保持不变。
 
 ## 开发与验证
 

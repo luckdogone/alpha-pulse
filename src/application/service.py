@@ -11,10 +11,10 @@ from agent.providers.deepseek import DeepSeekModel
 from agent.tools import ToolRegistry
 from application.demo import demo_snapshot
 from config import Settings
-from data.market import MarketData
-from data.providers.binance import Binance
-from data.providers.external import ExternalData
-from data.transport import DataError, JsonHTTP
+from data.errors import DataError
+from data.ingestion.providers.binance import Binance
+from data.ingestion.transport import JsonHTTP
+from data.pipeline import ExternalData, MarketData
 from domain.decision import Decision, DecisionTree
 from domain.models import (
     INTERVAL_MS,

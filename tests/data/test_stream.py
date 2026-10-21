@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from data.providers import binance as module
-from data.providers.binance import Binance
-from data.transport import DataError
+from data.errors import DataError
+from data.ingestion import transport as module
+from data.ingestion.providers.binance import Binance
 
 
 def event(timestamp, opened=60_000, closed=False, symbol="BTCUSDT"):
@@ -33,12 +33,13 @@ def event(timestamp, opened=60_000, closed=False, symbol="BTCUSDT"):
 class Socket:
     def __init__(self, messages):
         self.messages = iter(messages)
+        self.closed = False
 
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, *args):
-        pass
+        self.closed = True
 
     async def recv(self):
         return json.dumps(next(self.messages))
@@ -89,3 +90,43 @@ async def test_reconnect_attempts_are_bounded(settings, monkeypatch):
         await anext(stream)
     assert len(calls) == 6
     assert delays == [1, 2, 4, 8, 10]
+
+
+async def test_reconnect_keeps_replay_filter_and_closing_stream_closes_socket(
+    settings, monkeypatch
+):
+    first = Socket([event(101, closed=True)])
+    second = Socket([event(102, closed=True), event(103, opened=120_000, closed=True)])
+    original_recv = first.recv
+    reads = 0
+
+    async def interrupted_recv():
+        nonlocal reads
+        reads += 1
+        if reads > 1:
+            raise OSError("disconnected")
+        return await original_recv()
+
+    first.recv = interrupted_recv
+    sockets = iter([first, second])
+    calls = []
+
+    def connect(url, **kwargs):
+        calls.append(url)
+        return next(sockets)
+
+    async def sleep(delay):
+        assert delay == 1
+
+    settings.binance_ws_fallback_url_template = "wss://fallback.test/{symbol}/{interval}"
+    monkeypatch.setattr(module, "connect", connect)
+    monkeypatch.setattr(module.asyncio, "sleep", sleep)
+    stream = Binance(settings, None).stream("BTCUSDT", "1m")
+    try:
+        assert (await anext(stream))["event_time"] == 101
+        assert (await anext(stream))["event_time"] == 103
+        assert first.closed
+        assert calls[1] == "wss://fallback.test/btcusdt/1m"
+    finally:
+        await stream.aclose()
+    assert second.closed

@@ -2,10 +2,10 @@ import httpx
 import pytest
 
 from config import Settings
-from data.market import STATISTICS, MarketData
-from data.providers.binance import Binance
-from data.providers.external import ExternalData
-from data.transport import DataError, JsonHTTP
+from data.errors import DataError
+from data.ingestion.providers.binance import STATISTICS, Binance
+from data.ingestion.transport import JsonHTTP
+from data.pipeline import ExternalData, MarketData
 from domain.models import now_ms
 from storage.evidence import EvidenceStore
 
@@ -73,7 +73,10 @@ async def test_taker_flow_uses_buyer_maker_as_sell(settings):
     ]
     http = JsonHTTP(None, transport=httpx.MockTransport(lambda _: httpx.Response(200, json=rows)))
     try:
-        data = await Binance(settings, http).trades("BTCUSDT")
+        record = await MarketData(settings, Binance(settings, http), EvidenceStore()).order_flow(
+            "BTCUSDT"
+        )
+        data = record.data
         assert data["buy_ratio"] == 0.75
         assert data["taker_buy_quote"] == 30 and data["taker_sell_quote"] == 10
     finally:
@@ -97,7 +100,9 @@ async def test_book_rejects_nonfinite_prices(settings):
     )
     try:
         with pytest.raises(DataError, match="numeric market value"):
-            await Binance(settings, http).depth("BTCUSDT")
+            await MarketData(settings, Binance(settings, http), EvidenceStore()).order_book(
+                "BTCUSDT"
+            )
     finally:
         await http.close()
 
@@ -203,6 +208,49 @@ async def test_coinglass_sends_ms_and_records_exchange_coverage(settings):
         await http.close()
 
 
+async def test_coinmetrics_preserves_timestamp_and_partial_pagination(settings):
+    rows = [{"time": "2026-10-20T00:00:00Z", "AdrActCnt": "12", "TxCnt": "34"}]
+
+    def handler(request):
+        assert request.url.params["assets"] == "btc"
+        assert request.url.params["page_size"] == "4"
+        return httpx.Response(200, json={"data": rows, "next_page_url": "next"})
+
+    http = JsonHTTP(None, transport=httpx.MockTransport(handler))
+    try:
+        record = await ExternalData(settings, http, EvidenceStore()).onchain("BTCUSDT", "BTC")
+        assert record.status == "partial"
+        assert record.observed_at == 1_792_454_400_000
+        assert record.data == rows
+        assert record.summary["asset"] == "btc"
+    finally:
+        await http.close()
+
+
+@pytest.mark.parametrize("observed", [None, 1_792_454_400_000, 1_792_454_400])
+async def test_configured_onchain_requires_provider_millisecond_timestamp(settings, observed):
+    settings.onchain_url_template = "https://adapter.test/{base_asset}/{symbol}"
+    payload = {"observed_at": observed, "summary": {"transactions": 12}}
+
+    def handler(request):
+        assert request.url.path == "/btc/BTCUSDT"
+        return httpx.Response(200, json=payload)
+
+    http = JsonHTTP(None, transport=httpx.MockTransport(handler))
+    external = ExternalData(settings, http, EvidenceStore())
+    try:
+        if observed == 1_792_454_400:
+            with pytest.raises(DataError, match="UTC milliseconds"):
+                await external.onchain("BTCUSDT", "BTC")
+        else:
+            record = await external.onchain("BTCUSDT", "BTC")
+            assert record.observed_at == observed
+            assert record.summary == payload["summary"]
+            assert record.data == payload
+    finally:
+        await http.close()
+
+
 def test_lowercase_proxy_config_and_env_precedence(tmp_path, monkeypatch):
     env = tmp_path / "test.env"
     env.write_text("https_proxy=http://127.0.0.1:13659\nall_proxy=socks5://127.0.0.1:13659\n")
@@ -213,13 +261,24 @@ def test_lowercase_proxy_config_and_env_precedence(tmp_path, monkeypatch):
     assert Settings(_env_file=env).proxy() == "http://127.0.0.1:18080"
 
 
-async def test_snapshot_loads_half_hour_even_with_hourly_analysis(settings):
+@pytest.mark.parametrize(
+    "failed_path, problem",
+    [
+        (None, None),
+        ("/fapi/v1/depth", "required data get_order_book: error"),
+        ("/fapi/v1/premiumIndex", "required data get_mark_price: error"),
+        ("/futures/data/openInterestHist", None),
+    ],
+)
+async def test_snapshot_loads_half_hour_even_with_hourly_analysis(settings, failed_path, problem):
     now = now_ms()
     required_paths = []
 
     def handler(request):
         path, params = request.url.path, request.url.params
         required_paths.append(path)
+        if path == failed_path:
+            return httpx.Response(403, json={"secret": "must not leak"})
         if path.endswith("exchangeInfo"):
             data = {
                 "symbols": [
@@ -263,12 +322,17 @@ async def test_snapshot_loads_half_hour_even_with_hourly_analysis(settings):
 
     http = JsonHTTP(None, transport=httpx.MockTransport(handler))
     try:
-        snapshot = await MarketData(settings, Binance(settings, http), EvidenceStore()).snapshot(
+        store = EvidenceStore()
+        snapshot = await MarketData(settings, Binance(settings, http), store).snapshot(
             "BTCUSDT", "1h"
         )
         assert len(snapshot.recent_1m) == 31
         assert len(snapshot.candles) == 251
-        assert not snapshot.problems
+        assert snapshot.problems == ([problem] if problem else [])
+        if failed_path:
+            errors = [r for r in store.records.values() if r.status == "error"]
+            assert len(errors) == 1
+            assert "must not leak" not in errors[0].model_dump_json()
         assert len(snapshot.required_ids) == 6
         assert len(snapshot.evidence_ids) == 11
     finally:

@@ -2,13 +2,13 @@ import json
 
 from anthropic.types import Message
 
-from data.market import MarketData
+from data.pipeline import MarketData
 from tests.helpers import response
 
 
 async def test_service_fails_closed_on_provider_error(settings, monkeypatch):
     from application.service import analyze
-    from data.transport import DataError
+    from data.errors import DataError
 
     async def unavailable(*args, **kwargs):
         raise DataError("HTTP 451")
@@ -74,7 +74,7 @@ async def test_service_rechecks_price_after_model(settings, market_fixture, monk
 async def test_service_uses_configured_deepseek_provider(settings, monkeypatch):
     from application import service
     from application.demo import demo_snapshot
-    from data.market import MarketData
+    from data.pipeline import MarketData
 
     settings.model_provider = "deepseek"
 

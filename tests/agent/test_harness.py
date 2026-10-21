@@ -10,8 +10,7 @@ from agent.harness import AgentHarness
 from agent.prompts import SYSTEM_PROMPT
 from agent.providers.claude import ClaudeModel
 from agent.tools import ToolRegistry
-from data.market import MarketData
-from data.providers.external import ExternalData
+from data.pipeline import ExternalData, MarketData
 from domain.models import Assessment
 from tests.helpers import response
 

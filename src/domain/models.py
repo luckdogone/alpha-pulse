@@ -59,38 +59,6 @@ class Candle(Model):
             raise ValueError("invalid candle time/volume")
         return self
 
-    @classmethod
-    def from_rest(cls, row: list[Any], at: int) -> "Candle":
-        return cls(
-            open_time=row[0],
-            open=row[1],
-            high=row[2],
-            low=row[3],
-            close=row[4],
-            volume=row[5],
-            close_time=row[6],
-            quote_volume=row[7],
-            trades=row[8],
-            taker_buy_volume=row[9],
-            closed=row[6] < at,
-        )
-
-    @classmethod
-    def from_ws(cls, row: dict[str, Any]) -> "Candle":
-        return cls(
-            open_time=row["t"],
-            close_time=row["T"],
-            open=row["o"],
-            high=row["h"],
-            low=row["l"],
-            close=row["c"],
-            volume=row["v"],
-            quote_volume=row["q"],
-            trades=row["n"],
-            taker_buy_volume=row["V"],
-            closed=row["x"],
-        )
-
 
 class Quality(Model):
     score: float = Field(ge=0, le=1)

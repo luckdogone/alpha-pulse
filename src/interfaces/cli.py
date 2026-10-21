@@ -8,8 +8,9 @@ from pathlib import Path
 
 from application.service import analyze
 from config import Settings
-from data.providers.binance import Binance
-from data.transport import DataError, JsonHTTP
+from data.errors import DataError
+from data.ingestion.providers.binance import Binance
+from data.ingestion.transport import JsonHTTP
 from domain.models import INTERVAL_MS, INTERVALS, Prediction, normalize_symbol
 
 
@@ -130,7 +131,7 @@ async def run(args) -> int:
                 args.output,
             )
         elif args.command == "snapshot":
-            from data.market import MarketData
+            from data.pipeline import MarketData
             from storage.evidence import EvidenceStore
 
             store = EvidenceStore()

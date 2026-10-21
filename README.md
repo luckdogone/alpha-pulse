@@ -54,12 +54,12 @@ Alpha-Pulse 是一个以多金融市场为长期目标、由 AI Agent 驱动的�
 
 ```mermaid
 flowchart TB
-    Binance[Binance REST / WebSocket] --> Access[data/providers/binance.py / data/transport.py]
-    Sources[GDELT / Coin Metrics / CoinGlass] --> External[data/providers/external.py]
-    Access --> Market[data/market.py 快照 / domain/indicators.py 指标]
+    Binance[Binance REST / WebSocket] --> Access[data/ingestion/providers/binance.py]
+    Sources[GDELT / Coin Metrics / CoinGlass] --> External[data/ingestion/providers/external.py]
+    Access --> Market[data/pipeline.py 采集、清洗、加工、质量与组装]
+    External --> Market
     Market --> Service[application/service.py 分析编排]
     Market --> Evidence[storage/evidence.py 证据存储]
-    External --> Evidence
     CLI[interfaces/cli.py / Python 调用] --> Service
     Service --> Rules[domain/decision.py 规则与价格区间]
     Service --> Agent[agent/harness.py Agent 执行循环]
@@ -68,7 +68,6 @@ flowchart TB
     Agent <--> LLM[agent/providers/ DeepSeek / Claude]
     Agent --> Tools[agent/tools.py 工具注册与参数校验]
     Tools --> Market
-    Tools --> External
     Tools --> Evidence
     Rules --> Output[domain/models.py 结果校验]
     Service --> Output
@@ -79,9 +78,9 @@ flowchart TB
 | --- | --- | --- |
 | 应用入口 | `interfaces/cli.py` | 命令解析、实时监听和结果输出；Web API 待实现。 |
 | 应用编排 | `application/service.py`、`application/demo.py` | 组织单次分析、复核、归档及离线演示。 |
-| 领域规则 | `domain/` | 数据契约、技术指标、证据质量评分、方向规则与价格区间计算。 |
+| 领域规则 | `domain/` | 共享数据契约、方向规则与价格区间计算。 |
 | Agent | `agent/`、`agent/providers/` | 工具调用循环、上下文预算、模型适配和输出校验。 |
-| 数据接入与适配 | `data/market.py`、`data/providers/`、`data/transport.py` | 请求数据、组装统一快照、检查覆盖范围与完整性。 |
+| 数据处理 | `data/`、`data/pipeline.py` | 按采集、清洗、加工、质量和组装分工，统一编排行情与补充数据。 |
 | 证据存储 | `storage/evidence.py` | 管理证据索引、原始数据文件和分页读取。 |
 | 配置 | `config/settings.py`、`config/default_decision_tree.json` | 环境配置与默认规则资源。 |
 
@@ -91,11 +90,16 @@ alpha-pulse/                    # 当前 Git 仓库
 │   ├── __init__.py / __main__.py
 │   ├── interfaces/            # CLI 等用户入口
 │   ├── application/           # 分析编排与离线演示
-│   ├── domain/                # 数据模型、指标、质量与决策规则
+│   ├── domain/                # 共享数据模型与决策规则
 │   ├── agent/                 # Agent 执行循环、上下文、工具
 │   │   └── providers/         # Claude / DeepSeek 模型适配
-│   ├── data/                  # 行情快照适配与 HTTP 通信
-│   │   └── providers/         # Binance 与补充数据来源
+│   ├── data/                  # 数据处理与流水线
+│   │   ├── ingestion/         # 传输和数据来源适配
+│   │   ├── cleaning/          # 校验、标准化、去重与缺口检测
+│   │   ├── processing/        # 指标、订单流、流动性与爆仓统计
+│   │   ├── quality/           # 时效、完整性与质量评分
+│   │   ├── assembly/          # Snapshot、Evidence 和摘要
+│   │   └── pipeline.py        # 采集到证据保存的总编排
 │   ├── storage/               # 证据持久化与检索
 │   └── config/                # Settings 与默认决策树 JSON
 ├── tests/                     # 按 agent/application/data/domain/interfaces 分组

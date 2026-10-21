@@ -1,3 +1,4 @@
+from data.quality.freshness import freshness_factor
 from domain.models import Quality, now_ms
 
 
@@ -17,17 +18,9 @@ def assess_quality(
         "synthetic": 0.0,
     }.get(source, 0.4)
     reasons = [f"source={source}"]
-    if observed_at is None:
-        score *= 0.5
-        reasons.append("provider observation timestamp unknown")
-    elif observed_at > at + 5000:
-        score = 0
-        reasons.append("observation timestamp is in the future")
-    elif at - observed_at > ttl_ms:
-        score *= 0.25
-        reasons.append("stale for this data type")
-    else:
-        reasons.append("within data-specific freshness window")
+    factor, reason = freshness_factor(observed_at, ttl_ms, at)
+    score *= factor
+    reasons.append(reason)
     if status == "partial":
         score *= 0.6
         reasons.append("partial coverage")
