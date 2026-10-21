@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from application.demo import demo_snapshot
+from data.processing.liquidity import calculate_liquidity
 from domain.decision import Condition, DecisionTree
 from domain.models import Candle, PriceZone
 from storage.evidence import EvidenceStore
@@ -34,6 +35,25 @@ def test_missing_evidence_blocks_direction(market_fixture):
     snapshot, store, tree = market_fixture
     del store.records[snapshot.required_ids[0]]
     assert tree.evaluate(snapshot, store.records).direction == "no_trade"
+
+
+@pytest.mark.parametrize("side", ["bids", "asks"])
+def test_incomplete_band_blocks_otherwise_valid_direction(market_fixture, side):
+    snapshot, store, tree = market_fixture
+    book = {
+        "observed_at": snapshot.as_of,
+        "last_update_id": 1,
+        "bids": [[99.99, 3000], [99.5, 1]],
+        "asks": [[100.01, 1500], [100.5, 1]],
+    }
+    snapshot.order_book = calculate_liquidity(book)
+    assert tree.evaluate(snapshot, store.records).direction == "long"
+    book[side] = book[side][:1]
+    snapshot.order_book = calculate_liquidity(book)
+    decision = tree.evaluate(snapshot, store.records)
+    assert decision.direction == "no_trade"
+    assert decision.reason_code == "insufficient_data"
+    assert any("coverage" in p for p in decision.path[0]["problems"])
 
 
 def test_synthetic_not_accepted_in_live_mode(settings):

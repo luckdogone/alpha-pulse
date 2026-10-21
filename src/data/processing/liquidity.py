@@ -8,6 +8,14 @@ def depth_in_band(book: dict, mid: float, band: float) -> tuple[float, float]:
     )
 
 
+def band_coverage(book: dict, mid: float, band: float) -> dict[str, bool]:
+    """Only claim coverage through the retained, contiguous price levels."""
+    return {
+        "bid": book["bids"][-1][0] <= mid * (1 - band),
+        "ask": book["asks"][-1][0] >= mid * (1 + band),
+    }
+
+
 def estimated_slippage(book: dict, notional: float, mid: float) -> dict:
     quantity = notional / mid
     result = {}
@@ -31,15 +39,25 @@ def calculate_liquidity(book: dict, notional: float = 10_000, previous: dict | N
     depths = {
         label: depth_in_band(book, mid, band) for label, band in (("0.1%", 0.001), ("0.5%", 0.005))
     }
+    coverage = {
+        label: band_coverage(book, mid, band) for label, band in (("0.1%", 0.001), ("0.5%", 0.005))
+    }
     bid_value, ask_value = depths["0.5%"]
     total = bid_value + ask_value
+    imbalance = (
+        ((bid_value - ask_value) / total if total else 0)
+        if all(coverage["0.5%"].values())
+        else None
+    )
     change = None
     if previous:
         anchor = (previous["bids"][0][0] + previous["asks"][0][0]) / 2
         before = depth_in_band(previous, anchor, 0.005)
         after = depth_in_band(book, anchor, 0.005)
+        before_coverage = band_coverage(previous, anchor, 0.005)
+        after_coverage = band_coverage(book, anchor, 0.005)
         change = {
-            side: (b - a) / a if a else None
+            side: (b - a) / a if a and before_coverage[side] and after_coverage[side] else None
             for side, a, b in zip(("bid", "ask"), before, after, strict=True)
         }
     return {
@@ -51,17 +69,24 @@ def calculate_liquidity(book: dict, notional: float = 10_000, previous: dict | N
         "best_ask": asks[0][0],
         "mid_price": mid,
         "spread_bps": (asks[0][0] - bids[0][0]) / mid * 10_000,
-        "bid_notional": bid_value,
-        "ask_notional": ask_value,
-        "bid_depth_usdt": {label: values[0] for label, values in depths.items()},
-        "ask_depth_usdt": {label: values[1] for label, values in depths.items()},
-        "imbalance": (bid_value - ask_value) / total if total else 0,
-        "orderbook_imbalance": (bid_value - ask_value) / total if total else 0,
+        "bid_notional": bid_value if coverage["0.5%"]["bid"] else None,
+        "ask_notional": ask_value if coverage["0.5%"]["ask"] else None,
+        "bid_depth_usdt": {
+            label: values[0] if coverage[label]["bid"] else None for label, values in depths.items()
+        },
+        "ask_depth_usdt": {
+            label: values[1] if coverage[label]["ask"] else None for label, values in depths.items()
+        },
+        "depth_band_coverage": coverage,
+        "observed_bid_depth_usdt": {label: values[0] for label, values in depths.items()},
+        "observed_ask_depth_usdt": {label: values[1] for label, values in depths.items()},
+        "imbalance": imbalance,
+        "orderbook_imbalance": imbalance,
         "depth_change_rate": change,
         "estimated_slippage_bps": estimated_slippage(book, notional, mid),
         "slippage_notional_usdt": notional,
         "coverage": (
-            "visible levels only; band depth is a lower bound beyond retained levels; "
+            "visible levels only; uncovered bands are missing; observed depths are lower bounds; "
             "slippage includes half-spread"
         ),
         "bids": bids,

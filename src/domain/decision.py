@@ -93,6 +93,8 @@ class DecisionTree:
     ) -> Decision:
         at = (now_ms() if at is None else at) + snapshot.server_time_offset_ms
         problems = list(snapshot.problems)
+        if any(snapshot.order_book.get(key) is None for key in ("bid_notional", "ask_notional")):
+            problems.append("order book lacks complete bid/ask coverage of the 0.5% price band")
         if not snapshot.required_ids:
             problems.append("no required evidence")
         for evidence_id in snapshot.required_ids:

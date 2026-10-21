@@ -91,6 +91,10 @@ async def test_clock_skew_full_feature_context_fits_budget_and_masks_bad_sources
             if row["tool"] == "get_order_book"
         )
         tree = DecisionTree(settings.tree_file())
+        assert snapshot.feature_quality_status["orderbook_imbalance"] == "MISSING"
+        assert snapshot.features["orderbook_imbalance"] is None
+        assert snapshot.feature_quality_status["estimated_slippage_bps"] == "VALID"
+        assert tree.evaluate(snapshot, store.records).reason_code == "insufficient_data"
         registry = ToolRegistry(market, ExternalData(settings, http, store), store, 16)
         context = ContextWindow(
             snapshot,
@@ -155,6 +159,11 @@ async def test_live_snapshot_uses_stream_sources_with_evidence_provenance(settin
         assert snapshot.features["best_ask"] == 100.2
         assert snapshot.features["funding_rate_current"] == 0.0002
         assert snapshot.features["websocket_sequence_valid"] is True
+        assert snapshot.feature_quality_status["orderbook_imbalance"] == "MISSING"
+        assert snapshot.features["orderbook_imbalance"] is None
+        assert snapshot.feature_quality_status["estimated_slippage_bps"] == "VALID"
+        tree = DecisionTree(settings.tree_file())
+        assert tree.evaluate(snapshot, store.records).reason_code == "insufficient_data"
         source_id = snapshot.feature_metadata["funding_rate_current"]["evidence_ids"][0]
         assert store.records[source_id].tool == "get_mark_price_stream"
     finally:

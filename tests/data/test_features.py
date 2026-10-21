@@ -112,14 +112,81 @@ def test_top_trader_divergence_requires_matching_time_windows():
 
 
 def test_slippage_insufficient_depth_and_fixed_band_changes():
-    book = {"observed_at": 2000, "last_update_id": 2, "bids": [[99.9, 2]], "asks": [[100.1, 3]]}
-    previous = {**book, "bids": [[99.9, 4]], "asks": [[100.1, 3]]}
+    book = {
+        "observed_at": 2000,
+        "last_update_id": 2,
+        "bids": [[99.9, 2], [99, 1]],
+        "asks": [[100.1, 3], [101, 1]],
+    }
+    previous = {**book, "bids": [[99.9, 4], [99, 1]]}
     result = calculate_liquidity(book, notional=100, previous=previous)
     assert result["estimated_slippage_bps"] == pytest.approx({"buy": 10, "sell": 10})
     assert result["depth_change_rate"] == {"bid": -0.5, "ask": 0}
     assert calculate_liquidity(book, notional=1000)["estimated_slippage_bps"] == {
         "buy": None,
         "sell": None,
+    }
+
+
+@pytest.mark.parametrize("bid_edge, ask_edge", [(99.5, 100.5), (99.8, 100.5), (99.5, 100.2)])
+def test_depth_coverage_is_per_side_and_band(bid_edge, ask_edge):
+    result = calculate_liquidity(
+        {
+            "observed_at": 2000,
+            "last_update_id": 2,
+            "bids": [[99.99, 1000], [bid_edge, 1]],
+            "asks": [[100.01, 500], [ask_edge, 1]],
+        }
+    )
+    assert result["depth_band_coverage"]["0.1%"] == {"bid": True, "ask": True}
+    assert result["depth_band_coverage"]["0.5%"] == {
+        "bid": bid_edge == 99.5,
+        "ask": ask_edge == 100.5,
+    }
+    for side, complete in result["depth_band_coverage"]["0.5%"].items():
+        observed = result[f"observed_{side}_depth_usdt"]["0.5%"]
+        assert observed > 0
+        assert result[f"{side}_depth_usdt"]["0.5%"] == (observed if complete else None)
+        assert result[f"{side}_notional"] == (observed if complete else None)
+    assert (result["imbalance"] is not None) == (bid_edge == 99.5 and ask_edge == 100.5)
+    assert result["orderbook_imbalance"] == result["imbalance"]
+
+
+def test_truncated_band_cannot_publish_reversed_imbalance_but_slippage_is_usable():
+    book = {
+        "observed_at": 2000,
+        "last_update_id": 2,
+        "bids": [[99.99, 1000]],
+        "asks": [[100.01, 500]],
+    }
+    partial = calculate_liquidity(book)
+    full = calculate_liquidity(
+        {
+            **book,
+            "bids": book["bids"] + [[99.5, 1]],
+            "asks": book["asks"] + [[100.2, 2000], [100.5, 1]],
+        }
+    )
+    assert partial["observed_bid_depth_usdt"]["0.5%"] > partial["observed_ask_depth_usdt"]["0.5%"]
+    assert partial["imbalance"] is None
+    assert full["imbalance"] < 0
+    assert partial["estimated_slippage_bps"] == pytest.approx({"buy": 1, "sell": 1})
+    assert full["estimated_slippage_bps"] == partial["estimated_slippage_bps"]
+
+
+@pytest.mark.parametrize("incomplete", ["previous", "current"])
+def test_depth_change_requires_both_books_to_cover_the_fixed_band(incomplete):
+    book = {
+        "observed_at": 2000,
+        "last_update_id": 2,
+        "bids": [[99.99, 1000], [99.5, 1]],
+        "asks": [[100.01, 500], [100.5, 1]],
+    }
+    partial = {**book, "bids": book["bids"][:1]}
+    previous, current = (partial, book) if incomplete == "previous" else (book, partial)
+    assert calculate_liquidity(current, previous=previous)["depth_change_rate"] == {
+        "bid": None,
+        "ask": 0,
     }
 
 

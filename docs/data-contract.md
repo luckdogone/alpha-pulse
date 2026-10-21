@@ -68,6 +68,8 @@ REST 路径以 `https://fapi.binance.com` 为基础；`symbol` 使用完整交�
 | 溢价与结算 | `time_to_next_funding` 为相对于校准时钟的毫秒数，已过时的结算时间缺失；`mark_index_basis_pct = (mark-index)/index × 100`。 |
 | 强平 P2 | `liquidation_buy_usdt/sell_usdt/imbalance` 默认别名指向 5m；完整字段附 `_5m/_15m/_1h`。买入方向通常对应空头平仓，卖出对应多头平仓。只有连续订阅覆盖整个窗口才有效。 |
 
+盘口摘要中的 `depth_band_coverage` 按价格带和买卖侧独立记录覆盖情况。未覆盖到价格带边界时，对应 `bid_depth_usdt/ask_depth_usdt` 和旧 `bid_notional/ask_notional` 值为 null；已观测金额保存在 `observed_bid_depth_usdt/observed_ask_depth_usdt`，仅代表下界。0.5% 带任一侧未覆盖时，两个失衡字段均为 null，默认规则返回 `insufficient_data`。深度变化要求前后盘口均覆盖前一中价固定价格带；滑点独立按目标数量能否在已知档位内全部成交判断。本轮实现不自动增加采集档位。
+
 Binance forceOrder 每秒仅推送该时间段的最新事件，无法恢复全量强平。统计始终称为“已观测”，断线后窗口覆盖重新累计；不能把未观察到事件解释为交易所没有强平。盘口属于可见限价委托，也不包含隐藏流动性。
 
 ## 时间、质量与降级
